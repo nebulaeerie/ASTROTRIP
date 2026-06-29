@@ -28,7 +28,7 @@ const GALILEAN = [
 ]
 
 function makeControls(camera, el) {
-  let sph = { theta: Math.PI / 5, phi: Math.PI / 3.2, r: 300 }
+  let sph = { theta: Math.PI / 4, phi: Math.PI / 2.8, r: 320 }
   const target = new THREE.Vector3()
   let down = false, dragged = false, lx = 0, ly = 0, ptDist = null
 
