@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import PostsPage from './PostsPage'
+import GamesMenu from './GamesMenu'
 
 const BODIES = [
   { name: 'Sun',     texture: '/2k_sun.jpg',           fallback: 0xffdd00, size: 16,  distance: 0,   speed: 0,       emissive: true,  glowColor: '#ffaa00', glowSize: 1.35, info: 'The Sun contains 99.86% of the Solar System mass. Core temperature reaches 15 million degrees.', stats: { Type: 'G-type Star', Diameter: '1,392,700 km', 'Surface Temp': '5,500 C', Age: '4.6 billion yrs' } },
@@ -20,14 +21,14 @@ const MOON_INFO = {
   stats: { Type: 'Natural Satellite', Diameter: '3,474 km', Distance: '384,400 km', Temp: '-173 to 127 C' },
 }
 
-const GALILEAN = [
-  { name: 'Io',       color: 0xffcc44, size: 0.9,  orbitR: 17, speed: 0.018 },
-  { name: 'Europa',   color: 0xbbddff, size: 0.75, orbitR: 21, speed: 0.013 },
-  { name: 'Ganymede', color: 0xaa9988, size: 1.1,  orbitR: 26, speed: 0.009 },
-  { name: 'Callisto', color: 0x887766, size: 1.0,  orbitR: 32, speed: 0.006 },
-]
 
-function makeControls(camera, el) {
+const GALILEAN = [
+  { name: 'Io',       color: 0xffcc44, size: 0.9,  orbitR: 17, speed: 0.00015 },
+  { name: 'Europa',   color: 0xbbddff, size: 0.75, orbitR: 21, speed: 0.0001  },
+  { name: 'Ganymede', color: 0xaa9988, size: 1.1,  orbitR: 26, speed: 0.00006 },
+  { name: 'Callisto', color: 0x887766, size: 1.0,  orbitR: 32, speed: 0.00003 },
+]
+ function makeControls(camera, el) {
   let sph = { theta: Math.PI / 4, phi: Math.PI / 2.8, r: 320 }
   const target = new THREE.Vector3()
   let down = false, dragged = false, lx = 0, ly = 0, ptDist = null
@@ -167,10 +168,10 @@ function buildScene(scene) {
   const sg = new THREE.BufferGeometry()
   sg.setAttribute('position', new THREE.BufferAttribute(sp, 3))
   sg.setAttribute('color', new THREE.BufferAttribute(sc, 3))
-  scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ size: 0.65, vertexColors: true, sizeAttenuation: true })))
+  scene.add(new THREE.PointsMaterial({ size: 0.9, vertexColors: true, sizeAttenuation: true, transparent: true, opacity: 0.85 }))
 
   // Asteroid belt
-  const ap = new Float32Array(2400 * 3)
+ const ap = new Float32Array(2400 * 3)
   for (let i = 0; i < 2400; i++) {
     const a = Math.random() * Math.PI * 2, r = 86 + Math.random() * 10
     ap[i*3] = Math.cos(a)*r; ap[i*3+1] = (Math.random()-0.5)*2; ap[i*3+2] = Math.sin(a)*r
@@ -211,7 +212,7 @@ export default function App() {
     const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 6000)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+    renderer.setPixelRatio(window.devicePixelRatio)
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 0.85
     mount.appendChild(renderer.domElement)
@@ -220,8 +221,8 @@ export default function App() {
     controlsRef.current = controls
 
     buildScene(scene)
-    scene.add(new THREE.AmbientLight(0x0a0a22, 2))
-    const sunLight = new THREE.PointLight(0xfff5e0, 4, 2200)
+    scene.add(new THREE.AmbientLight(0xffffff, 1.8))
+    const sunLight = new THREE.PointLight(0xfff5e0, 3, 0)
     scene.add(sunLight)
 
     const loader = new THREE.TextureLoader()
@@ -309,8 +310,12 @@ export default function App() {
     renderer.domElement.addEventListener('pointerup', onPU)
 
     let animId
+    let starAngle = 0
     function animate() {
       animId = requestAnimationFrame(animate)
+      starAngle += 0.00008
+      sg.attributes.position.needsUpdate = true
+      scene.rotation.y = starAngle
       BODIES.forEach((b, i) => {
         if (b.distance > 0) { angles[i] += b.speed; meshes[i].position.x = Math.cos(angles[i]) * b.distance; meshes[i].position.z = Math.sin(angles[i]) * b.distance }
         meshes[i].rotation.y += b.emissive ? 0.0008 : 0.003
@@ -357,7 +362,7 @@ export default function App() {
           <button style={nb()} onClick={() => { setPage(null); closePanel() }}>Explorer</button>
           <button style={nb(page === 'article')}  onClick={() => { setPage('article');  setSelected(null) }}>Articles</button>
           <button style={nb(page === 'research')} onClick={() => { setPage('research'); setSelected(null) }}>Research</button>
-          <button style={nb()}>Game</button>
+          <button style={nb(page === 'game')} onClick={() => { setPage('game'); setSelected(null) }}>Game</button>
           <button style={{ ...nb(showFavs), fontSize:'1rem', padding:'7px 12px', display:'flex', alignItems:'center', gap:'5px' }} onClick={() => setShowFavs(v => !v)}>
             ★{favorites.length > 0 && <span style={{ background:'#5577ff', color:'#fff', borderRadius:'10px', fontSize:'0.68rem', padding:'1px 5px', fontWeight:600 }}>{favorites.length}</span>}
           </button>
@@ -371,6 +376,14 @@ export default function App() {
           </div>
         </div>
       )}
+      
+      {page === 'game' && (
+  <div style={s.overlay}>
+    <div style={s.overlayInner} className="page-scrollable">
+      <GamesMenu onBack={() => setPage(null)} />
+    </div>
+  </div>
+)}
 
       {!selected && !page && (
         <div style={{ position:'absolute', bottom:'22px', left:'50%', transform:'translateX(-50%)', color:'rgba(160,190,255,0.35)', fontSize:'0.76rem', display:'flex', gap:'10px', zIndex:10, whiteSpace:'nowrap' }}>
