@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import PostsPage from './PostsPage'
 import GamesMenu from './GamesMenu'
+import { loadStars, starInfoPanel } from './starData'
 
 const BODIES = [
   { name: 'Sun',     texture: '/2k_sun.jpg',           fallback: 0xffdd00, size: 16,  distance: 0,   speed: 0,       emissive: true,  glowColor: '#ffaa00', glowSize: 1.35, info: 'The Sun contains 99.86% of the Solar System mass. Core temperature reaches 15 million degrees.', stats: { Type: 'G-type Star', Diameter: '1,392,700 km', 'Surface Temp': '5,500 C', Age: '4.6 billion yrs' } },
@@ -21,15 +22,15 @@ const MOON_INFO = {
   stats: { Type: 'Natural Satellite', Diameter: '3,474 km', Distance: '384,400 km', Temp: '-173 to 127 C' },
 }
 
-
 const GALILEAN = [
-  { name: 'Io',       color: 0xffcc44, size: 0.9,  orbitR: 17, speed: 0.00015 },
-  { name: 'Europa',   color: 0xbbddff, size: 0.75, orbitR: 21, speed: 0.0001  },
-  { name: 'Ganymede', color: 0xaa9988, size: 1.1,  orbitR: 26, speed: 0.00006 },
-  { name: 'Callisto', color: 0x887766, size: 1.0,  orbitR: 32, speed: 0.00003 },
+  { name: 'Io',       color: 0xffcc44, size: 0.9,  orbitR: 17, speed: 0.018 },
+  { name: 'Europa',   color: 0xbbddff, size: 0.75, orbitR: 21, speed: 0.013 },
+  { name: 'Ganymede', color: 0xaa9988, size: 1.1,  orbitR: 26, speed: 0.009 },
+  { name: 'Callisto', color: 0x887766, size: 1.0,  orbitR: 32, speed: 0.006 },
 ]
- function makeControls(camera, el) {
-  let sph = { theta: Math.PI / 4, phi: Math.PI / 2.8, r: 320 }
+
+function makeControls(camera, el) {
+  let sph = { theta: Math.PI / 5, phi: Math.PI / 3.2, r: 300 }
   const target = new THREE.Vector3()
   let down = false, dragged = false, lx = 0, ly = 0, ptDist = null
 
@@ -157,21 +158,11 @@ function buildScene(scene) {
   })
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(2500, 32, 32), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc), side: THREE.BackSide })))
 
-  // Stars
-  const N = 22000
-  const sp = new Float32Array(N * 3), sc = new Float32Array(N * 3)
-  for (let i = 0; i < N; i++) {
-    const r = 800 + Math.random() * 1600, th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1)
-    sp[i*3] = r*Math.sin(ph)*Math.cos(th); sp[i*3+1] = r*Math.sin(ph)*Math.sin(th); sp[i*3+2] = r*Math.cos(ph)
-    sc[i*3] = 0.82 + Math.random()*0.18; sc[i*3+1] = 0.85 + (Math.random()-0.5)*0.1; sc[i*3+2] = 0.92 + Math.random()*0.08
-  }
-  const sg = new THREE.BufferGeometry()
-  sg.setAttribute('position', new THREE.BufferAttribute(sp, 3))
-  sg.setAttribute('color', new THREE.BufferAttribute(sc, 3))
-  scene.add(new THREE.PointsMaterial({ size: 0.9, vertexColors: true, sizeAttenuation: true, transparent: true, opacity: 0.85 }))
+  // Stars are loaded separately from the real HYG catalog (see loadStars()
+  // call in the main effect below) instead of being randomly generated here.
 
   // Asteroid belt
- const ap = new Float32Array(2400 * 3)
+  const ap = new Float32Array(2400 * 3)
   for (let i = 0; i < 2400; i++) {
     const a = Math.random() * Math.PI * 2, r = 86 + Math.random() * 10
     ap[i*3] = Math.cos(a)*r; ap[i*3+1] = (Math.random()-0.5)*2; ap[i*3+2] = Math.sin(a)*r
@@ -209,10 +200,11 @@ export default function App() {
   useEffect(() => {
     const mount = mountRef.current
     const scene = new THREE.Scene()
+    buildScene(scene)
     const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 6000)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.toneMapping = THREE.ACESFilmicToneMapping
     renderer.toneMappingExposure = 0.85
     mount.appendChild(renderer.domElement)
@@ -220,7 +212,6 @@ export default function App() {
     const controls = makeControls(camera, renderer.domElement)
     controlsRef.current = controls
 
-    buildScene(scene)
     scene.add(new THREE.AmbientLight(0xffffff, 1.8))
     const sunLight = new THREE.PointLight(0xfff5e0, 3, 0)
     scene.add(sunLight)
@@ -280,6 +271,31 @@ export default function App() {
     })
     const galAngles = GALILEAN.map((_, i) => (i / GALILEAN.length) * Math.PI * 2)
 
+    // Real star catalog: adds the point cloud once loaded, plus small
+    // invisible hit-targets for named/bright stars so they're clickable
+    // exactly like planets and moons.
+    let starLookup = []
+    loadStars().then(({ positions, colors, named }) => {
+      const sg = new THREE.BufferGeometry()
+      sg.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      sg.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+      scene.add(new THREE.Points(sg, new THREE.PointsMaterial({
+        size: 1.15, vertexColors: true, sizeAttenuation: false, transparent: true, opacity: 0.95,
+      })))
+
+      starLookup = named
+      named.forEach((star, si) => {
+        const hit = new THREE.Mesh(
+          new THREE.SphereGeometry(4, 6, 6),
+          new THREE.MeshBasicMaterial({ transparent: true, opacity: 0 })
+        )
+        hit.position.set(star.position[0], star.position[1], star.position[2])
+        hit.userData = { starIndex: si }
+        scene.add(hit)
+        clickTargets.push(hit)
+      })
+    }).catch(err => console.error('Star catalog failed to load:', err))
+
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
     let clickStart = { x: 0, y: 0 }
@@ -303,6 +319,9 @@ export default function App() {
       } else if (hit.userData.bodyIndex !== undefined) {
         const b = BODIES[hit.userData.bodyIndex]
         setSelected(b); controls.animateTo(meshes[hit.userData.bodyIndex].position.clone(), b.size * 6 + 18); setIsZoomed(true)
+      } else if (hit.userData.starIndex !== undefined) {
+        const star = starLookup[hit.userData.starIndex]
+        if (star) { setSelected(starInfoPanel(star)); controls.animateTo(hit.position.clone(), 30); setIsZoomed(true) }
       }
     }
 
@@ -310,12 +329,8 @@ export default function App() {
     renderer.domElement.addEventListener('pointerup', onPU)
 
     let animId
-    let starAngle = 0
     function animate() {
       animId = requestAnimationFrame(animate)
-      starAngle += 0.00008
-      sg.attributes.position.needsUpdate = true
-      scene.rotation.y = starAngle
       BODIES.forEach((b, i) => {
         if (b.distance > 0) { angles[i] += b.speed; meshes[i].position.x = Math.cos(angles[i]) * b.distance; meshes[i].position.z = Math.sin(angles[i]) * b.distance }
         meshes[i].rotation.y += b.emissive ? 0.0008 : 0.003
@@ -376,14 +391,14 @@ export default function App() {
           </div>
         </div>
       )}
-      
+
       {page === 'game' && (
-  <div style={s.overlay}>
-    <div style={s.overlayInner} className="page-scrollable">
-      <GamesMenu onBack={() => setPage(null)} />
-    </div>
-  </div>
-)}
+        <div style={{ position:'absolute', inset:0, zIndex:15, background:'rgba(2,3,15,0.82)', backdropFilter:'blur(2px)' }}>
+          <div style={{ width:'100%', height:'100%' }} className="page-scrollable">
+            <GamesMenu onBack={() => setPage(null)} />
+          </div>
+        </div>
+      )}
 
       {!selected && !page && (
         <div style={{ position:'absolute', bottom:'22px', left:'50%', transform:'translateX(-50%)', color:'rgba(160,190,255,0.35)', fontSize:'0.76rem', display:'flex', gap:'10px', zIndex:10, whiteSpace:'nowrap' }}>

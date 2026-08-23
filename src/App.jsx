@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import PostsPage from './PostsPage'
+import GamesMenu from './GamesMenu'
 
 const BODIES = [
   { name: 'Sun',     texture: '/2k_sun.jpg',           fallback: 0xffdd00, size: 16,  distance: 0,   speed: 0,       emissive: true,  glowColor: '#ffaa00', glowSize: 1.35, info: 'The Sun contains 99.86% of the Solar System mass. Core temperature reaches 15 million degrees.', stats: { Type: 'G-type Star', Diameter: '1,392,700 km', 'Surface Temp': '5,500 C', Age: '4.6 billion yrs' } },
@@ -21,10 +22,44 @@ const MOON_INFO = {
 }
 
 const GALILEAN = [
-  { name: 'Io',       color: 0xffcc44, size: 0.9,  orbitR: 17, speed: 0.018 },
-  { name: 'Europa',   color: 0xbbddff, size: 0.75, orbitR: 21, speed: 0.013 },
-  { name: 'Ganymede', color: 0xaa9988, size: 1.1,  orbitR: 26, speed: 0.009 },
-  { name: 'Callisto', color: 0x887766, size: 1.0,  orbitR: 32, speed: 0.006 },
+  { name: 'Io',       color: 0xffcc44, size: 0.9,  orbitR: 17, speed: 0.003 },
+  { name: 'Europa',   color: 0xbbddff, size: 0.75, orbitR: 21, speed: 0.0022 },
+  { name: 'Ganymede', color: 0xaa9988, size: 1.1,  orbitR: 26, speed: 0.0015 },
+  { name: 'Callisto', color: 0x887766, size: 1.0,  orbitR: 32, speed: 0.001 },
+]
+
+// Real bright named stars: [name, RA-hours, Dec-degrees, apparent magnitude, constellation]
+// Hand-entered from published catalog values. Placed on a fixed sky-radius
+// shell using true RA/Dec direction (not true distance, since real star
+// distances vary from a few to thousands of light years and would put them
+// absurdly far past the outer planets on this scene's scale).
+const NAMED_STARS = [
+  ['Sirius', 6.75, -16.72, -1.46, 'Canis Major'], ['Canopus', 6.40, -52.70, -0.74, 'Carina'],
+  ['Alpha Centauri', 14.66, -60.83, -0.27, 'Centaurus'], ['Arcturus', 14.26, 19.18, -0.05, 'Bootes'],
+  ['Vega', 18.62, 38.78, 0.03, 'Lyra'], ['Capella', 5.28, 45.99, 0.08, 'Auriga'],
+  ['Rigel', 5.24, -8.20, 0.13, 'Orion'], ['Procyon', 7.65, 5.22, 0.34, 'Canis Minor'],
+  ['Betelgeuse', 5.92, 7.41, 0.50, 'Orion'], ['Achernar', 1.63, -57.24, 0.46, 'Eridanus'],
+  ['Hadar', 14.06, -60.37, 0.61, 'Centaurus'], ['Altair', 19.85, 8.87, 0.76, 'Aquila'],
+  ['Acrux', 12.44, -63.10, 0.76, 'Crux'], ['Aldebaran', 4.60, 16.51, 0.85, 'Taurus'],
+  ['Antares', 16.49, -26.43, 1.09, 'Scorpius'], ['Spica', 13.42, -11.16, 0.97, 'Virgo'],
+  ['Pollux', 7.76, 28.03, 1.14, 'Gemini'], ['Fomalhaut', 22.96, -29.62, 1.16, 'Piscis Austrinus'],
+  ['Deneb', 20.69, 45.28, 1.25, 'Cygnus'], ['Regulus', 10.14, 11.97, 1.36, 'Leo'],
+  ['Castor', 7.58, 31.89, 1.58, 'Gemini'], ['Bellatrix', 5.42, 6.35, 1.64, 'Orion'],
+  ['Elnath', 5.44, 28.61, 1.65, 'Taurus'], ['Alnilam', 5.60, -1.20, 1.69, 'Orion'],
+  ['Alnitak', 5.68, -1.94, 1.74, 'Orion'], ['Alioth', 12.90, 55.96, 1.77, 'Ursa Major'],
+  ['Dubhe', 11.06, 61.75, 1.79, 'Ursa Major'], ['Mirfak', 3.41, 49.86, 1.79, 'Perseus'],
+  ['Wezen', 7.14, -26.39, 1.83, 'Canis Major'], ['Kaus Australis', 18.40, -34.38, 1.85, 'Sagittarius'],
+  ['Alkaid', 13.79, 49.31, 1.86, 'Ursa Major'], ['Menkalinan', 5.99, 44.95, 1.90, 'Auriga'],
+  ['Alhena', 6.63, 16.40, 1.93, 'Gemini'], ['Peacock', 20.43, -56.74, 1.94, 'Pavo'],
+  ['Mirzam', 6.38, -17.96, 1.98, 'Canis Major'], ['Alphard', 9.46, -8.66, 1.98, 'Hydra'],
+  ['Polaris', 2.53, 89.26, 1.98, 'Ursa Minor'], ['Hamal', 2.12, 23.46, 2.01, 'Aries'],
+  ['Diphda', 0.73, -17.99, 2.04, 'Cetus'], ['Mizar', 13.40, 54.93, 2.23, 'Ursa Major'],
+  ['Kochab', 14.85, 74.16, 2.07, 'Ursa Minor'], ['Saiph', 5.80, -9.67, 2.06, 'Orion'],
+  ['Algol', 3.14, 40.96, 2.12, 'Perseus'], ['Denebola', 11.82, 14.57, 2.14, 'Leo'],
+  ['Alnair', 22.14, -46.96, 1.74, 'Grus'], ['Sadr', 20.37, 40.26, 2.23, 'Cygnus'],
+  ['Rasalhague', 17.58, 12.56, 2.08, 'Ophiuchus'], ['Eltanin', 17.94, 51.49, 2.24, 'Draco'],
+  ['Scheat', 23.06, 28.08, 2.44, 'Pegasus'], ['Markab', 23.08, 15.21, 2.50, 'Pegasus'],
+  ['Menkar', 3.04, 4.09, 2.54, 'Cetus'], ['Zubenelgenubi', 14.85, -16.04, 2.75, 'Libra'],
 ]
 
 function makeControls(camera, el) {
@@ -136,6 +171,16 @@ function makeGlow(color, size) {
   return s
 }
 
+function raDecToXYZ(raHours, decDeg, radius) {
+  const ra = (raHours / 24) * Math.PI * 2
+  const dec = (decDeg * Math.PI) / 180
+  return [
+    radius * Math.cos(dec) * Math.cos(ra),
+    radius * Math.sin(dec),
+    radius * Math.cos(dec) * Math.sin(ra),
+  ]
+}
+
 function buildScene(scene) {
   // Nebula background
   const nc = document.createElement('canvas')
@@ -156,7 +201,8 @@ function buildScene(scene) {
   })
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(2500, 32, 32), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc), side: THREE.BackSide })))
 
-  // Stars
+  // Background stars: dense random field for visual fullness (not real data,
+  // just decoration) plus the real named stars rendered brighter/larger on top.
   const N = 22000
   const sp = new Float32Array(N * 3), sc = new Float32Array(N * 3)
   for (let i = 0; i < N; i++) {
@@ -168,6 +214,15 @@ function buildScene(scene) {
   sg.setAttribute('position', new THREE.BufferAttribute(sp, 3))
   sg.setAttribute('color', new THREE.BufferAttribute(sc, 3))
   scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ size: 0.65, vertexColors: true, sizeAttenuation: true })))
+
+  const namedPos = new Float32Array(NAMED_STARS.length * 3)
+  NAMED_STARS.forEach(([, ra, dec], i) => {
+    const [x, y, z] = raDecToXYZ(ra, dec, 2300)
+    namedPos[i*3] = x; namedPos[i*3+1] = y; namedPos[i*3+2] = z
+  })
+  const ng = new THREE.BufferGeometry()
+  ng.setAttribute('position', new THREE.BufferAttribute(namedPos, 3))
+  scene.add(new THREE.Points(ng, new THREE.PointsMaterial({ color: 0xffffff, size: 2.4, sizeAttenuation: false, transparent: true, opacity: 0.95 })))
 
   // Asteroid belt
   const ap = new Float32Array(2400 * 3)
@@ -208,6 +263,7 @@ export default function App() {
   useEffect(() => {
     const mount = mountRef.current
     const scene = new THREE.Scene()
+    buildScene(scene)
     const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 6000)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(window.innerWidth, window.innerHeight)
@@ -220,8 +276,8 @@ export default function App() {
     controlsRef.current = controls
 
     scene.add(new THREE.AmbientLight(0xffffff, 1.8))
-const sunLight = new THREE.PointLight(0xfff5e0, 3, 0)
-scene.add(sunLight)
+    const sunLight = new THREE.PointLight(0xfff5e0, 3, 0)
+    scene.add(sunLight)
 
     const loader = new THREE.TextureLoader()
     function loadTex(path, cb) { loader.load(path, cb, undefined, () => cb(null)) }
@@ -278,30 +334,60 @@ scene.add(sunLight)
     })
     const galAngles = GALILEAN.map((_, i) => (i / GALILEAN.length) * Math.PI * 2)
 
+        // Real named stars: precompute their world positions once. Clicking is
+    // detected via on-screen distance (see onPU below), since raycasting
+    // against tiny, extremely distant points is unreliable.
+    const namedStarPositions = NAMED_STARS.map(([, ra, dec]) => {
+      const [x, y, z] = raDecToXYZ(ra, dec, 2300)
+      return new THREE.Vector3(x, y, z)
+    })
+
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
     let clickStart = { x: 0, y: 0 }
 
     function onPD(e) { clickStart = { x: e.clientX, y: e.clientY } }
-    function onPU(e) {
+        function onPU(e) {
       if (controls.isDragged()) return
       if (Math.abs(e.clientX - clickStart.x) > 6 || Math.abs(e.clientY - clickStart.y) > 6) return
       mouse.x = (e.clientX / window.innerWidth) * 2 - 1
       mouse.y = -(e.clientY / window.innerHeight) * 2 + 1
       raycaster.setFromCamera(mouse, camera)
       const hits = raycaster.intersectObjects(clickTargets, false)
-      if (!hits.length) { setSelected(null); controls.reset(); setIsZoomed(false); return }
-      const hit = hits[0].object
-      if (hit.userData.isMoon) {
-        setSelected(MOON_INFO); controls.animateTo(moonMesh.position.clone(), 14); setIsZoomed(true)
-      } else if (hit.userData.galIndex !== undefined) {
-        const g = GALILEAN[hit.userData.galIndex]
-        setSelected({ name: g.name, info: g.name + ' is one of Jupiter four Galilean moons discovered by Galileo in 1610.', stats: { Type: 'Moon of Jupiter' } })
-        controls.animateTo(hit.position.clone(), g.size * 8); setIsZoomed(true)
-      } else if (hit.userData.bodyIndex !== undefined) {
-        const b = BODIES[hit.userData.bodyIndex]
-        setSelected(b); controls.animateTo(meshes[hit.userData.bodyIndex].position.clone(), b.size * 6 + 18); setIsZoomed(true)
+      if (hits.length) {
+        const hit = hits[0].object
+        if (hit.userData.isMoon) {
+          setSelected(MOON_INFO); controls.animateTo(moonMesh.position.clone(), 14); setIsZoomed(true)
+        } else if (hit.userData.galIndex !== undefined) {
+          const g = GALILEAN[hit.userData.galIndex]
+          setSelected({ name: g.name, info: g.name + ' is one of Jupiter four Galilean moons discovered by Galileo in 1610.', stats: { Type: 'Moon of Jupiter' } })
+          controls.animateTo(hit.position.clone(), g.size * 8); setIsZoomed(true)
+        } else if (hit.userData.bodyIndex !== undefined) {
+          const b = BODIES[hit.userData.bodyIndex]
+          setSelected(b); controls.animateTo(meshes[hit.userData.bodyIndex].position.clone(), b.size * 6 + 18); setIsZoomed(true)
+        }
+        return
       }
+
+      // No 3D object hit: check if the click landed near a named star's
+      // on-screen position instead.
+      let closestIdx = -1, closestDist = 26
+      namedStarPositions.forEach((pos, si) => {
+        const p = pos.clone().project(camera)
+        if (p.z > 1) return
+        const sx = (p.x * 0.5 + 0.5) * window.innerWidth
+        const sy = (-p.y * 0.5 + 0.5) * window.innerHeight
+        const d = Math.hypot(sx - e.clientX, sy - e.clientY)
+        if (d < closestDist) { closestDist = d; closestIdx = si }
+      })
+      if (closestIdx >= 0) {
+        const [name, , , mag, con] = NAMED_STARS[closestIdx]
+        setSelected({ name, info: name + ' is a real star, shown at its true position in the sky as seen from Earth.', stats: { Type: 'Star', 'Apparent Mag': mag, Constellation: con } })
+        controls.animateTo(namedStarPositions[closestIdx].clone(), 30); setIsZoomed(true)
+        return
+      }
+
+      setSelected(null); controls.reset(); setIsZoomed(false)
     }
 
     renderer.domElement.addEventListener('pointerdown', onPD)
@@ -356,7 +442,7 @@ scene.add(sunLight)
           <button style={nb()} onClick={() => { setPage(null); closePanel() }}>Explorer</button>
           <button style={nb(page === 'article')}  onClick={() => { setPage('article');  setSelected(null) }}>Articles</button>
           <button style={nb(page === 'research')} onClick={() => { setPage('research'); setSelected(null) }}>Research</button>
-          <button style={nb()}>Game</button>
+          <button style={nb(page === 'game')} onClick={() => { setPage('game'); setSelected(null) }}>Game</button>
           <button style={{ ...nb(showFavs), fontSize:'1rem', padding:'7px 12px', display:'flex', alignItems:'center', gap:'5px' }} onClick={() => setShowFavs(v => !v)}>
             ★{favorites.length > 0 && <span style={{ background:'#5577ff', color:'#fff', borderRadius:'10px', fontSize:'0.68rem', padding:'1px 5px', fontWeight:600 }}>{favorites.length}</span>}
           </button>
@@ -367,6 +453,14 @@ scene.add(sunLight)
         <div style={{ position:'absolute', inset:0, zIndex:15, background:'rgba(2,3,15,0.82)', backdropFilter:'blur(2px)' }}>
           <div style={{ width:'100%', height:'100%' }} className="page-scrollable">
             <PostsPage type={page} onBack={() => setPage(null)} />
+          </div>
+        </div>
+      )}
+
+      {page === 'game' && (
+        <div style={{ position:'absolute', inset:0, zIndex:15, background:'rgba(2,3,15,0.82)', backdropFilter:'blur(2px)' }}>
+          <div style={{ width:'100%', height:'100%' }} className="page-scrollable">
+            <GamesMenu onBack={() => setPage(null)} />
           </div>
         </div>
       )}
