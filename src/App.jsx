@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import PostsPage from './PostsPage'
 import GamesMenu from './GamesMenu'
+import { loadBrightStarCatalog } from './starData'
 
 const BODIES = [
   { name: 'Sun',     texture: '/2k_sun.jpg',           fallback: 0xffdd00, size: 16,  distance: 0,   speed: 0,       emissive: true,  glowColor: '#ffaa00', glowSize: 1.35, info: 'The Sun contains 99.86% of the Solar System mass. Core temperature reaches 15 million degrees.', stats: { Type: 'G-type Star', Diameter: '1,392,700 km', 'Surface Temp': '5,500 C', Age: '4.6 billion yrs' } },
@@ -29,10 +30,6 @@ const GALILEAN = [
 ]
 
 // Real bright named stars: [name, RA-hours, Dec-degrees, apparent magnitude, constellation]
-// Hand-entered from published catalog values. Placed on a fixed sky-radius
-// shell using true RA/Dec direction (not true distance, since real star
-// distances vary from a few to thousands of light years and would put them
-// absurdly far past the outer planets on this scene's scale).
 const NAMED_STARS = [
   ['Sirius', 6.75, -16.72, -1.46, 'Canis Major'], ['Canopus', 6.40, -52.70, -0.74, 'Carina'],
   ['Alpha Centauri', 14.66, -60.83, -0.27, 'Centaurus'], ['Arcturus', 14.26, 19.18, -0.05, 'Bootes'],
@@ -171,6 +168,19 @@ function makeGlow(color, size) {
   return s
 }
 
+function makeStarTexture() {
+  const c = document.createElement('canvas')
+  c.width = c.height = 64
+  const ctx = c.getContext('2d')
+  const g = ctx.createRadialGradient(32, 32, 0, 32, 32, 32)
+  g.addColorStop(0, 'rgba(255,255,255,1)')
+  g.addColorStop(0.4, 'rgba(255,255,255,0.8)')
+  g.addColorStop(1, 'rgba(255,255,255,0)')
+  ctx.fillStyle = g
+  ctx.fillRect(0, 0, 64, 64)
+  return new THREE.CanvasTexture(c)
+}
+
 function raDecToXYZ(raHours, decDeg, radius) {
   const ra = (raHours / 24) * Math.PI * 2
   const dec = (decDeg * Math.PI) / 180
@@ -182,7 +192,6 @@ function raDecToXYZ(raHours, decDeg, radius) {
 }
 
 function buildScene(scene) {
-  // Nebula background
   const nc = document.createElement('canvas')
   nc.width = nc.height = 512
   const nctx = nc.getContext('2d')
@@ -201,8 +210,6 @@ function buildScene(scene) {
   })
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(2500, 32, 32), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc), side: THREE.BackSide })))
 
-  // Background stars: dense random field for visual fullness (not real data,
-  // just decoration) plus the real named stars rendered brighter/larger on top.
   const N = 22000
   const sp = new Float32Array(N * 3), sc = new Float32Array(N * 3)
   for (let i = 0; i < N; i++) {
@@ -210,10 +217,11 @@ function buildScene(scene) {
     sp[i*3] = r*Math.sin(ph)*Math.cos(th); sp[i*3+1] = r*Math.sin(ph)*Math.sin(th); sp[i*3+2] = r*Math.cos(ph)
     sc[i*3] = 0.82 + Math.random()*0.18; sc[i*3+1] = 0.85 + (Math.random()-0.5)*0.1; sc[i*3+2] = 0.92 + Math.random()*0.08
   }
+  const starTex = makeStarTexture()
   const sg = new THREE.BufferGeometry()
   sg.setAttribute('position', new THREE.BufferAttribute(sp, 3))
   sg.setAttribute('color', new THREE.BufferAttribute(sc, 3))
-  scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ size: 0.65, vertexColors: true, sizeAttenuation: true })))
+  scene.add(new THREE.Points(sg, new THREE.PointsMaterial({ size: 1.4, map: starTex, vertexColors: true, sizeAttenuation: true, transparent: true, alphaTest: 0.01 })))
 
   const namedPos = new Float32Array(NAMED_STARS.length * 3)
   NAMED_STARS.forEach(([, ra, dec], i) => {
@@ -222,9 +230,8 @@ function buildScene(scene) {
   })
   const ng = new THREE.BufferGeometry()
   ng.setAttribute('position', new THREE.BufferAttribute(namedPos, 3))
-  scene.add(new THREE.Points(ng, new THREE.PointsMaterial({ color: 0xffffff, size: 2.4, sizeAttenuation: false, transparent: true, opacity: 0.95 })))
+  scene.add(new THREE.Points(ng, new THREE.PointsMaterial({ color: 0xfff8e8, size: 1.6, map: starTex, sizeAttenuation: true, transparent: true, alphaTest: 0.01, opacity: 0.95 })))
 
-  // Asteroid belt
   const ap = new Float32Array(2400 * 3)
   for (let i = 0; i < 2400; i++) {
     const a = Math.random() * Math.PI * 2, r = 86 + Math.random() * 10
@@ -334,20 +341,44 @@ export default function App() {
     })
     const galAngles = GALILEAN.map((_, i) => (i / GALILEAN.length) * Math.PI * 2)
 
-        // Real named stars: precompute their world positions once. Clicking is
-    // detected via on-screen distance (see onPU below), since raycasting
-    // against tiny, extremely distant points is unreliable.
     const namedStarPositions = NAMED_STARS.map(([, ra, dec]) => {
       const [x, y, z] = raDecToXYZ(ra, dec, 2300)
       return new THREE.Vector3(x, y, z)
     })
+
+    // Full Yale Bright Star Catalog (~9,096 real stars). Loaded async since
+    // it comes from a separate JSON file. Rendered as a dedicated point
+    // cloud, and made clickable via the same on-screen-distance approach
+    // used for the named stars (raycasting against tiny distant points is
+    // unreliable, so we compare projected screen position instead).
+    let bscStars = []
+    loadBrightStarCatalog().then(stars => {
+      const bscTex = makeStarTexture()
+      bscStars = stars.map(s => {
+        const [x, y, z] = raDecToXYZ(s.ra, s.dec, 2300)
+        return { ...s, position: new THREE.Vector3(x, y, z) }
+      })
+      const positions = new Float32Array(bscStars.length * 3)
+      const colors = new Float32Array(bscStars.length * 3)
+      bscStars.forEach((s, i) => {
+        positions[i*3] = s.position.x; positions[i*3+1] = s.position.y; positions[i*3+2] = s.position.z
+        const b = Math.max(0.35, 1 - Math.max(0, s.mag - 2.5) / 8)
+        colors[i*3] = b; colors[i*3+1] = b * 0.98; colors[i*3+2] = b * 0.92
+      })
+      const bg = new THREE.BufferGeometry()
+      bg.setAttribute('position', new THREE.BufferAttribute(positions, 3))
+      bg.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+      scene.add(new THREE.Points(bg, new THREE.PointsMaterial({
+        size: 1.5, map: bscTex, vertexColors: true, sizeAttenuation: true, transparent: true, alphaTest: 0.01, opacity: 0.95,
+      })))
+    }).catch(err => console.error('Bright Star Catalog failed to load:', err))
 
     const raycaster = new THREE.Raycaster()
     const mouse = new THREE.Vector2()
     let clickStart = { x: 0, y: 0 }
 
     function onPD(e) { clickStart = { x: e.clientX, y: e.clientY } }
-        function onPU(e) {
+    function onPU(e) {
       if (controls.isDragged()) return
       if (Math.abs(e.clientX - clickStart.x) > 6 || Math.abs(e.clientY - clickStart.y) > 6) return
       mouse.x = (e.clientX / window.innerWidth) * 2 - 1
@@ -369,21 +400,43 @@ export default function App() {
         return
       }
 
-      // No 3D object hit: check if the click landed near a named star's
-      // on-screen position instead.
-      let closestIdx = -1, closestDist = 26
+      let bestDist = 45, bestKind = null, bestIdx = -1
       namedStarPositions.forEach((pos, si) => {
         const p = pos.clone().project(camera)
         if (p.z > 1) return
         const sx = (p.x * 0.5 + 0.5) * window.innerWidth
         const sy = (-p.y * 0.5 + 0.5) * window.innerHeight
         const d = Math.hypot(sx - e.clientX, sy - e.clientY)
-        if (d < closestDist) { closestDist = d; closestIdx = si }
+        if (d < bestDist) { bestDist = d; bestKind = 'named'; bestIdx = si }
       })
-      if (closestIdx >= 0) {
-        const [name, , , mag, con] = NAMED_STARS[closestIdx]
+      bscStars.forEach((s, si) => {
+        const p = s.position.clone().project(camera)
+        if (p.z > 1) return
+        const sx = (p.x * 0.5 + 0.5) * window.innerWidth
+        const sy = (-p.y * 0.5 + 0.5) * window.innerHeight
+        const d = Math.hypot(sx - e.clientX, sy - e.clientY)
+        if (d < bestDist) { bestDist = d; bestKind = 'bsc'; bestIdx = si }
+      })
+      if (bestKind === 'named') {
+        const [name, , , mag, con] = NAMED_STARS[bestIdx]
         setSelected({ name, info: name + ' is a real star, shown at its true position in the sky as seen from Earth.', stats: { Type: 'Star', 'Apparent Mag': mag, Constellation: con } })
-        controls.animateTo(namedStarPositions[closestIdx].clone(), 30); setIsZoomed(true)
+        controls.animateTo(namedStarPositions[bestIdx].clone(), 30); setIsZoomed(true)
+        return
+      }
+            if (bestKind === 'bsc') {
+        const s = bscStars[bestIdx]
+        const cls = (s.spectral || '').trim().charAt(0).toUpperCase()
+        const desc = {
+          O: 'a blue, extremely hot and massive star',
+          B: 'a blue-white star, hot and short-lived',
+          A: 'a white star, hotter and brighter than the Sun',
+          F: 'a yellow-white star, slightly hotter than the Sun',
+          G: 'a yellow star, the same class as our Sun',
+          K: 'an orange star, cooler than the Sun',
+          M: 'a red star, the coolest and most common type',
+        }[cls] || 'a star with an unusual or uncatalogued spectral type'
+        setSelected({ name: 'HR ' + s.hr, info: `HR ${s.hr} is ${desc}, shown at its true position in the sky as seen from Earth.`, stats: { Type: 'Star', 'Apparent Mag': s.mag.toFixed(2), Spectral: s.spectral || 'Unknown' } })
+        controls.animateTo(s.position.clone(), 30); setIsZoomed(true)
         return
       }
 
@@ -433,17 +486,17 @@ export default function App() {
       <div ref={mountRef} style={{ width:'100%', height:'100%', position:'absolute', inset:0 }} />
       <div style={{ position:'absolute', inset:0, background:'#02030f', transition:'opacity 1.4s ease', opacity: ready ? 0 : 1, pointerEvents:'none', zIndex:50 }} />
 
-      <header style={{ position:'absolute', top:0, left:0, right:0, zIndex:20, display:'flex', justifyContent:'space-between', alignItems:'center', padding:'16px 28px', background:'linear-gradient(to bottom, rgba(2,3,15,0.96) 55%, transparent)' }}>
+      <header style={{ position:'absolute', top:0, left:0, right:0, zIndex:20, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', rowGap:'8px', padding:'12px clamp(10px,4vw,28px)', background:'linear-gradient(to bottom, rgba(2,3,15,0.96) 55%, transparent)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
           <span style={{ color:'#7ba4ff', fontSize:'1.2rem' }}>✦</span>
-          <span style={{ color:'#fff', fontSize:'1.15rem', fontWeight:300, letterSpacing:'0.28em', fontFamily:'Georgia, serif' }}>ASTRO-TRIP</span>
+          <span style={{ color:'#fff', fontSize:'1.15rem', fontWeight:300, letterSpacing:'0.28em', fontFamily:'Georgia, serif' }}>ASTROTRIP</span>
         </div>
-        <nav style={{ display:'flex', gap:'4px', alignItems:'center' }}>
+        <nav style={{ display:'flex', gap:'4px', alignItems:'center', flexWrap:'wrap' }}>
           <button style={nb()} onClick={() => { setPage(null); closePanel() }}>Explorer</button>
           <button style={nb(page === 'article')}  onClick={() => { setPage('article');  setSelected(null) }}>Articles</button>
           <button style={nb(page === 'research')} onClick={() => { setPage('research'); setSelected(null) }}>Research</button>
           <button style={nb(page === 'game')} onClick={() => { setPage('game'); setSelected(null) }}>Game</button>
-          <button style={{ ...nb(showFavs), fontSize:'1rem', padding:'7px 12px', display:'flex', alignItems:'center', gap:'5px' }} onClick={() => setShowFavs(v => !v)}>
+          <button style={{ ...nb(showFavs), fontSize:'1rem', padding:'clamp(5px,1.5vw,7px) clamp(8px,2.5vw,12px)', display:'flex', alignItems:'center', gap:'5px' }} onClick={() => setShowFavs(v => !v)}>
             ★{favorites.length > 0 && <span style={{ background:'#5577ff', color:'#fff', borderRadius:'10px', fontSize:'0.68rem', padding:'1px 5px', fontWeight:600 }}>{favorites.length}</span>}
           </button>
         </nav>
@@ -472,7 +525,7 @@ export default function App() {
       )}
 
       {selected && !page && (
-        <div style={{ position:'absolute', bottom:'28px', left:'24px', background:'rgba(4,6,26,0.93)', border:'1px solid rgba(100,140,255,0.22)', borderRadius:'16px', padding:'26px', maxWidth:'320px', width:'calc(100vw - 48px)', backdropFilter:'blur(20px)', zIndex:10, boxShadow:'0 8px 48px rgba(0,0,70,0.6)', animation:'slideUp 0.35s cubic-bezier(0.16,1,0.3,1)' }}>
+        <div style={{ position:'absolute', bottom:'clamp(12px,4vw,28px)', left:'clamp(12px,4vw,24px)', background:'rgba(4,6,26,0.93)', border:'1px solid rgba(100,140,255,0.22)', borderRadius:'16px', padding:'clamp(16px,4vw,26px)', maxWidth:'320px', width:'calc(100vw - clamp(24px,8vw,48px))', backdropFilter:'blur(20px)', zIndex:10, boxShadow:'0 8px 48px rgba(0,0,70,0.6)', animation:'slideUp 0.35s cubic-bezier(0.16,1,0.3,1)' }}>
           <button onClick={closePanel} style={{ position:'absolute', top:'12px', right:'12px', background:'transparent', border:'none', color:'rgba(160,185,255,0.45)', fontSize:'1rem', cursor:'pointer', padding:'4px 8px' }}>✕</button>
           <div style={{ color:'#fff', fontSize:'1.55rem', fontFamily:'Georgia, serif', fontWeight:400, marginBottom:'10px' }}>{selected.name}</div>
           <p style={{ color:'rgba(185,205,255,0.8)', fontSize:'0.86rem', lineHeight:1.68, marginBottom:'18px' }}>{selected.info}</p>
@@ -511,7 +564,7 @@ export default function App() {
 }
 
 function nb(active) {
-  return { background: active ? 'rgba(100,140,255,0.15)' : 'transparent', border: active ? '1px solid rgba(100,140,255,0.3)' : '1px solid transparent', color: active ? '#c8d8ff' : 'rgba(180,205,255,0.55)', padding:'7px 14px', borderRadius:'8px', fontSize:'0.8rem', letterSpacing:'0.06em', cursor:'pointer', fontFamily:'inherit' }
+  return { background: active ? 'rgba(100,140,255,0.15)' : 'transparent', border: active ? '1px solid rgba(100,140,255,0.3)' : '1px solid transparent', color: active ? '#c8d8ff' : 'rgba(180,205,255,0.55)', padding:'clamp(5px,1.5vw,7px) clamp(8px,2.5vw,14px)', borderRadius:'8px', fontSize:'clamp(0.68rem,2.2vw,0.8rem)', letterSpacing:'0.06em', cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }
 }
 function ab(active) {
   return { background: active ? 'rgba(100,150,255,0.18)' : 'transparent', border: active ? '1px solid rgba(100,150,255,0.55)' : '1px solid rgba(100,150,255,0.3)', color: active ? '#ccdaff' : '#99bbff', padding:'8px 16px', borderRadius:'8px', cursor:'pointer', fontSize:'0.8rem', letterSpacing:'0.04em', fontFamily:'inherit' }
