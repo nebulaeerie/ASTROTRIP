@@ -74,7 +74,7 @@ const SGR_A = { name: 'Sagittarius A*', ra: 17.75, dec: -29.0, info: 'The superm
 
 function makeControls(camera, el) {
   let sph = { theta: Math.PI / 5, phi: Math.PI / 3.2, r: 300 }
-  const target = new THREE.Vector3()
+    const target = new THREE.Vector3()
   let down = false, dragged = false, lx = 0, ly = 0, ptDist = null
 
   function update() {
@@ -100,8 +100,28 @@ function makeControls(camera, el) {
   function onPU() { down = false }
   function onW(e) {
   e.preventDefault()
+
   const factor = Math.exp(e.deltaY * 0.001)
-  sph.r = Math.max(3, Math.min(950, sph.r * factor))
+  const newR = Math.max(3, Math.min(950, sph.r * factor))
+
+  // Cursor position in normalized device coords (-1 to 1)
+  const rect = el.getBoundingClientRect()
+  const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1
+  const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1
+
+  // Ray from camera through the cursor
+  const raycaster = new THREE.Raycaster()
+  raycaster.setFromCamera(new THREE.Vector2(nx, ny), camera)
+
+  // Point on that ray at the current distance and at the new distance
+  const currentPoint = raycaster.ray.at(sph.r, new THREE.Vector3())
+  const newPoint = raycaster.ray.at(newR, new THREE.Vector3())
+
+  // Shift the target so we're heading toward whatever is under the cursor
+  const delta = currentPoint.clone().sub(newPoint)
+  target.add(delta.multiplyScalar(0.85))
+
+  sph.r = newR
   update()
 }
   function onTS(e) {
