@@ -282,7 +282,7 @@ export default function AstroGuess({ onBack }) {
 }
 
 const s = {
-  root: { minHeight: '100vh', background: '#02030f', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 24px 60px' },
+  root: { minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center', padding: '0 24px 60px' },
   backBtn: { alignSelf: 'flex-start', marginTop: '24px', background: 'transparent', border: '1px solid rgba(100,140,255,0.25)', color: 'rgba(180,200,255,0.7)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontFamily: 'inherit' },
   menuBox: { display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '20px', maxWidth: '520px', width: '100%', marginTop: '40px' },
   icon: { fontSize: '4rem' },

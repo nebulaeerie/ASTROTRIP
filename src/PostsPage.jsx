@@ -19,8 +19,31 @@ function PostCard({ post, lang, onClick }) {
       onMouseEnter={e => { e.currentTarget.style.borderColor = 'rgba(120,160,255,0.4)'; e.currentTarget.style.transform = 'translateY(-2px)' }}
       onMouseLeave={e => { e.currentTarget.style.borderColor = 'rgba(80,110,200,0.15)'; e.currentTarget.style.transform = 'translateY(0)' }}
     >
-      {post.cover_image && <img src={post.cover_image} alt={title} style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block' }} />}
+      {post.cover_image && (
+  <div style={{
+  width: '100%',
+  background: 'rgba(0,0,0,0.2)',
+  aspectRatio: '1 / 1',
+  overflow: 'hidden'
+}}>
+    <img
+      src={post.cover_image}
+      alt={title}
+      style={{
+        width: '100%',
+        height: 'auto',
+        objectFit: 'contain',
+        display: 'block'
+      }}
+    />
+  </div>
+)}
       <div style={{ padding: '24px' }}>
+        {post.series && (
+          <div style={{ display: 'inline-block', background: 'rgba(100,140,255,0.15)', border: '1px solid rgba(100,140,255,0.3)', color: '#aac4ff', fontSize: '0.7rem', letterSpacing: '0.06em', padding: '3px 10px', borderRadius: '20px', marginBottom: '10px' }}>
+            {post.series}{post.part_number ? ` · Part ${post.part_number}` : ''}
+          </div>
+        )}
         <time style={{ color: 'rgba(120,160,255,0.5)', fontSize: '0.72rem', letterSpacing: '0.12em', display: 'block', marginBottom: '10px' }}>{date}</time>
         <h2 style={{ color: '#e8f0ff', fontSize: '1.25rem', fontFamily: 'Georgia, serif', fontWeight: 400, margin: '0 0 12px', lineHeight: 1.3 }}>{title}</h2>
         {excerpt && <p style={{ color: 'rgba(170,190,240,0.65)', fontSize: '0.85rem', lineHeight: 1.7, margin: '0 0 16px' }}>{excerpt}{excerpt.length >= 180 ? '…' : ''}</p>}
@@ -30,26 +53,81 @@ function PostCard({ post, lang, onClick }) {
   )
 }
 
-function PostModal({ post, lang, onClose }) {
+function PostModal({ post, lang, onClose, posts, onNavigate }) {
   const t = post.translations?.[lang.code] || post.translations?.en || {}
   const title = t.title || 'Untitled'
+  const excerpt = t.excerpt || ''
   const body = t.body || ''
   const date = new Date(post.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+
+  const seriesSiblings = post.series
+    ? posts.filter(p => p.series === post.series).sort((a, b) => (a.part_number || 0) - (b.part_number || 0))
+    : []
+  const idx = seriesSiblings.findIndex(p => p.id === post.id)
+  const prevPost = idx > 0 ? seriesSiblings[idx - 1] : null
+  const nextPost = idx >= 0 && idx < seriesSiblings.length - 1 ? seriesSiblings[idx + 1] : null
+
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     const onKey = e => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', onKey)
     return () => { document.body.style.overflow = ''; window.removeEventListener('keydown', onKey) }
   }, [onClose])
+
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,10,0.85)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: 'clamp(16px,6vw,48px) clamp(8px,3vw,24px)' }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: 'rgba(4,6,26,0.98)', border: '1px solid rgba(100,140,255,0.2)', borderRadius: '20px', maxWidth: '760px', width: '100%', position: 'relative', boxShadow: '0 24px 80px rgba(0,0,60,0.7)', overflow: 'hidden', direction: lang.dir }}>
+      <div onClick={e => e.stopPropagation()} style={{ background: 'rgba(4,6,26,0.98)', border: '1px solid rgba(100,140,255,0.2)', borderRadius: '20px', maxWidth: '1100px', width: '100%', position: 'relative', boxShadow: '0 24px 80px rgba(0,0,60,0.7)', overflow: 'hidden', direction: lang.dir }}>
         <button onClick={onClose} style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(80,110,200,0.15)', border: '1px solid rgba(100,140,255,0.2)', color: 'rgba(200,220,255,0.7)', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', fontSize: '0.9rem', zIndex: 10 }}>✕</button>
-        {post.cover_image && <img src={post.cover_image} alt={title} style={{ width: '100%', maxHeight: '360px', objectFit: 'cover', display: 'block' }} />}
+         {post.cover_image && (
+  <img
+    src={post.cover_image}
+    alt={title}
+    style={{
+      width: '100%',
+      maxWidth: '850px',
+      height: 'auto',
+      display: 'block',
+      margin: '0 auto'
+    }}
+  />
+)}
         <div style={{ padding: 'clamp(20px,5vw,40px) clamp(16px,5vw,48px) clamp(28px,7vw,56px)' }}>
+          {post.series && (
+            <div style={{ display: 'inline-block', background: 'rgba(100,140,255,0.15)', border: '1px solid rgba(100,140,255,0.3)', color: '#aac4ff', fontSize: '0.72rem', letterSpacing: '0.06em', padding: '4px 12px', borderRadius: '20px', marginBottom: '14px' }}>
+              {post.series}{post.part_number ? ` · Part ${post.part_number} of ${seriesSiblings.length}` : ''}
+            </div>
+          )}
           <time style={{ color: 'rgba(120,160,255,0.5)', fontSize: '0.72rem', letterSpacing: '0.12em', display: 'block', marginBottom: '10px' }}>{date}</time>
           <h1 style={{ color: '#fff', fontSize: 'clamp(1.8rem,4vw,2.8rem)', fontFamily: 'Georgia, serif', fontWeight: 300, margin: '0 0 32px', lineHeight: 1.2 }}>{title}</h1>
+
+         {excerpt && (
+         <p style={{
+         color: 'rgba(170,190,240,0.7)',
+         fontSize: '1.05rem',
+         lineHeight: 1.7,
+    fontStyle: 'italic',
+    margin: '-16px 0 32px'
+  }}>
+    {excerpt}
+  </p>
+)}
           <div style={{ color: 'rgba(190,210,255,0.85)', fontSize: '1rem', lineHeight: 1.85 }} dangerouslySetInnerHTML={{ __html: body.replace(/\n/g, '<br/>') }} />
+
+          
+          {(prevPost || nextPost) && (
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginTop: '40px', paddingTop: '24px', borderTop: '1px solid rgba(80,110,200,0.15)' }}>
+              {prevPost ? (
+                <button onClick={() => onNavigate(prevPost)} style={{ background: 'rgba(80,110,200,0.1)', border: '1px solid rgba(100,140,255,0.25)', color: 'rgba(200,220,255,0.85)', padding: '10px 16px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.82rem', fontFamily: 'inherit', textAlign: 'left' }}>
+                  ← Part {prevPost.part_number}
+                </button>
+              ) : <span />}
+              {nextPost ? (
+                <button onClick={() => onNavigate(nextPost)} style={{ background: 'rgba(80,110,200,0.1)', border: '1px solid rgba(100,140,255,0.25)', color: 'rgba(200,220,255,0.85)', padding: '10px 16px', borderRadius: '10px', cursor: 'pointer', fontSize: '0.82rem', fontFamily: 'inherit', textAlign: 'right' }}>
+                  Part {nextPost.part_number} →
+                </button>
+              ) : <span />}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -80,7 +158,7 @@ export default function PostsPage({ type, onBack }) {
   }, [type])
 
   return (
-    <div style={{ minHeight: '100vh', background: '#02030f', fontFamily: 'Inter, system-ui, sans-serif' }}>
+    <div style={{ minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif' }}>
       <header style={{ position: 'sticky', top: 0, zIndex: 100, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', rowGap: '8px', padding: '14px clamp(14px,4vw,48px)', background: 'rgba(2,3,15,0.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(80,110,200,0.12)' }}>
         <button onClick={onBack} style={{ background: 'transparent', border: '1px solid rgba(100,140,255,0.25)', color: 'rgba(180,200,255,0.7)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontFamily: 'inherit' }}>← Solar System</button>
         <div style={{ position: 'relative' }}>
@@ -88,7 +166,7 @@ export default function PostsPage({ type, onBack }) {
             {lang.name} ▾
           </button>
           {showLangMenu && (
-            <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', background: 'rgba(4,6,26,0.98)', border: '1px solid rgba(100,140,255,0.2)', borderRadius: '12px', padding: '8px', zIndex: 200, maxHeight: '320px', overflowY: 'auto', minWidth: '180px', boxShadow: '0 16px 48px rgba(0,0,60,0.6)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px' }}>
+            <div style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', background: 'rgba(4,6,26,0.98)', border: '1px solid rgba(100,140,255,0.2)', borderRadius: '12px', padding: '8px', zIndex: 200, maxHeight: 'none', overflowY: 'auto', minWidth: '180px', boxShadow: '0 16px 48px rgba(0,0,60,0.6)', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2px' }}>
               {LANGUAGES.map(l => (
                 <button key={l.code} onClick={() => { setLang(l); setShowLangMenu(false) }}
                   style={{ background: l.code === lang.code ? 'rgba(100,140,255,0.2)' : 'transparent', border: 'none', color: l.code === lang.code ? '#c8d8ff' : 'rgba(180,200,255,0.7)', padding: '8px 12px', borderRadius: '6px', cursor: 'pointer', fontSize: '0.8rem', textAlign: 'left', fontFamily: 'inherit' }}>
@@ -112,7 +190,7 @@ export default function PostsPage({ type, onBack }) {
         {!loading && posts.map(post => <PostCard key={post.id} post={post} lang={lang} onClick={setSelected} />)}
       </div>
 
-      {selected && <PostModal post={selected} lang={lang} onClose={() => setSelected(null)} />}
+      {selected && <PostModal post={selected} lang={lang} onClose={() => setSelected(null)} posts={posts} onNavigate={setSelected} />}
     </div>
   )
 }

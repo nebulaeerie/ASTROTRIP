@@ -74,7 +74,7 @@ export default function GamesMenu({ onBack }) {
 }
 
 const s = {
-  root: { minHeight: '100vh', background: '#02030f', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center' },
+  root: { minHeight: '100vh', fontFamily: 'Inter, system-ui, sans-serif', display: 'flex', flexDirection: 'column', alignItems: 'center' },
   bg: { position: 'fixed', inset: 0, background: 'radial-gradient(ellipse at 30% 40%, rgba(30,40,120,0.12) 0%, transparent 60%), radial-gradient(ellipse at 70% 60%, rgba(80,20,120,0.08) 0%, transparent 50%)', pointerEvents: 'none' },
   header: { position: 'sticky', top: 0, zIndex: 10, width: '100%', display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '18px 40px', background: 'rgba(2,3,15,0.92)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(80,110,200,0.12)' },
   backBtn: { background: 'transparent', border: '1px solid rgba(100,140,255,0.25)', color: 'rgba(180,200,255,0.7)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontFamily: 'inherit' },

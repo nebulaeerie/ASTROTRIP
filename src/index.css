@@ -27,3 +27,52 @@ html, body, #root {
   0%   { background-position: -600px 0; }
   100% { background-position:  600px 0; }
 }
+
+
+
+.noteBody p {
+  margin: 0 0 12px 0;
+}
+.noteBody p:last-child {
+  margin-bottom: 0;
+}
+
+.sky-bg {
+  position: relative;
+  min-height: 100%;
+  background:
+    radial-gradient(1px 1px at 20% 30%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(1px 1px at 70% 60%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 40% 80%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(2px 2px at 85% 15%, rgba(200,220,255,0.7), transparent),
+    radial-gradient(1px 1px at 10% 70%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 55% 20%, rgba(255,255,255,0.6), transparent),
+    radial-gradient(2px 2px at 30% 50%, rgba(180,200,255,0.5), transparent),
+    radial-gradient(1px 1px at 90% 80%, rgba(255,255,255,0.5), transparent),
+    radial-gradient(1px 1px at 65% 40%, rgba(255,255,255,0.4), transparent),
+    radial-gradient(1px 1px at 15% 15%, rgba(255,255,255,0.5), transparent);
+  background-color: transparent;
+}
+
+.sky-card {
+  transition: border-color 200ms ease, transform 200ms ease, box-shadow 200ms ease;
+}
+.sky-card:hover {
+  border-color: rgba(120,150,255,0.35) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 1px 0 rgba(255,255,255,0.05) inset, 0 12px 28px rgba(0,0,0,0.35) !important;
+}
+
+.noteBody p {
+  margin: 0 0 12px 0;
+}
+.noteBody p:last-child {
+  margin-bottom: 0;
+}
+/* in index.css */
+.city-item-hover { background: rgba(120,150,255,0.15); }
+
+html, body {
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}

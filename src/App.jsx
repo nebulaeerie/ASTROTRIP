@@ -1,3 +1,4 @@
+import TonightSky from './TonightSky'
 import { useEffect, useRef, useState, useCallback } from 'react'
 import * as THREE from 'three'
 import PostsPage from './PostsPage'
@@ -29,7 +30,6 @@ const GALILEAN = [
   { name: 'Callisto', color: 0x887766, size: 1.0,  orbitR: 32, speed: 0.001 },
 ]
 
-// Real bright named stars: [name, RA-hours, Dec-degrees, apparent magnitude, constellation]
 const NAMED_STARS = [
   ['Sirius', 6.75, -16.72, -1.46, 'Canis Major'], ['Canopus', 6.40, -52.70, -0.74, 'Carina'],
   ['Alpha Centauri', 14.66, -60.83, -0.27, 'Centaurus'], ['Arcturus', 14.26, 19.18, -0.05, 'Bootes'],
@@ -59,6 +59,19 @@ const NAMED_STARS = [
   ['Menkar', 3.04, 4.09, 2.54, 'Cetus'], ['Zubenelgenubi', 14.85, -16.04, 2.75, 'Libra'],
 ]
 
+const DEEP_SPACE_RADIUS = 2450
+
+const REAL_GALAXIES = [
+  { name: 'Andromeda Galaxy (M31)', ra: 0.71, dec: 41.27, texture: '/galaxy_andromeda.jpg', size: 90, info: 'The nearest large spiral galaxy to the Milky Way, containing roughly one trillion stars. It is on a collision course with our own galaxy, expected to merge in about 4.5 billion years.', stats: { Type: 'Spiral Galaxy', Distance: '2.5 million ly', Diameter: '220,000 ly' } },
+  { name: "Bode's Galaxy (M81)", ra: 9.93, dec: 69.07, texture: '/galaxy_m81.jpg', size: 80, info: 'One of the brightest galaxies visible from Earth, with a nearly perfect spiral structure and a supermassive black hole at its core.', stats: { Type: 'Spiral Galaxy', Distance: '12 million ly', Diameter: '90,000 ly' } },
+  { name: 'Sombrero Galaxy (M104)', ra: 12.67, dec: -11.62, texture: '/galaxy_sombrero.jpg', size: 70, info: 'Named for its resemblance to a wide-brimmed hat, with a bright bulge and a prominent dust lane surrounding a large central black hole.', stats: { Type: 'Spiral (unbarred)', Distance: '29 million ly', Diameter: '50,000 ly' } },
+  { name: 'Cigar Galaxy (M82)', ra: 9.93, dec: 69.68, texture: '/galaxy_m82.jpg', size: 60, info: "A starburst galaxy forming stars at a rate 10 times faster than the Milky Way, distorted by gravitational interaction with its neighbor M81.", stats: { Type: 'Starburst Galaxy', Distance: '12 million ly', Diameter: '37,000 ly' } },
+  { name: 'Large Magellanic Cloud', ra: 5.40, dec: -69.75, color: '#ffe4c4', shape: 'irregular', size: 40, info: 'A dwarf galaxy and satellite of the Milky Way, visible to the naked eye from the Southern Hemisphere.', stats: { Type: 'Irregular Dwarf Galaxy', Distance: '160,000 ly', Diameter: '14,000 ly' } },
+  { name: 'Small Magellanic Cloud', ra: 0.88, dec: -72.83, color: '#ffd8a8', shape: 'irregular', size: 30, info: 'A smaller companion dwarf galaxy to the Large Magellanic Cloud, also orbiting the Milky Way.', stats: { Type: 'Irregular Dwarf Galaxy', Distance: '200,000 ly', Diameter: '7,000 ly' } },
+]
+
+const SGR_A = { name: 'Sagittarius A*', ra: 17.75, dec: -29.0, info: 'The supermassive black hole at the center of the Milky Way, about 4.3 million times the mass of the Sun. The Event Horizon Telescope captured the first image of it in 2022.', stats: { Type: 'Supermassive Black Hole', Distance: '26,000 ly (galactic center)', Mass: '~4.3 million Suns' } }
+
 function makeControls(camera, el) {
   let sph = { theta: Math.PI / 5, phi: Math.PI / 3.2, r: 300 }
   const target = new THREE.Vector3()
@@ -85,7 +98,12 @@ function makeControls(camera, el) {
     update()
   }
   function onPU() { down = false }
-  function onW(e) { sph.r = Math.max(28, Math.min(950, sph.r + e.deltaY * 0.12)); update() }
+  function onW(e) {
+  e.preventDefault()
+  const factor = Math.exp(e.deltaY * 0.001)
+  sph.r = Math.max(3, Math.min(950, sph.r * factor))
+  update()
+}
   function onTS(e) {
     if (e.touches.length === 1) { lx = e.touches[0].clientX; ly = e.touches[0].clientY; dragged = false }
     if (e.touches.length === 2) ptDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
@@ -110,7 +128,7 @@ function makeControls(camera, el) {
   el.addEventListener('pointerdown', onPD)
   window.addEventListener('pointermove', onPM)
   window.addEventListener('pointerup', onPU)
-  el.addEventListener('wheel', onW, { passive: true })
+  el.addEventListener('wheel', onW, { passive: false })
   el.addEventListener('touchstart', onTS, { passive: true })
   el.addEventListener('touchmove', onTM, { passive: true })
   el.addEventListener('touchend', onTE)
@@ -152,6 +170,26 @@ function makeControls(camera, el) {
   return { isDragged: () => dragged, animateTo, reset, dispose }
 }
 
+function loadFadedTexture(url, onReady) {
+  const img = new Image()
+  img.onload = () => {
+    const c = document.createElement('canvas')
+    c.width = img.width; c.height = img.height
+    const ctx = c.getContext('2d')
+    ctx.drawImage(img, 0, 0)
+    ctx.globalCompositeOperation = 'destination-in'
+    const cx = c.width / 2, cy = c.height / 2
+    const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.min(cx, cy) * 0.95)
+    grad.addColorStop(0, 'rgba(255,255,255,1)')
+    grad.addColorStop(0.65, 'rgba(255,255,255,0.9)')
+    grad.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.fillStyle = grad
+    ctx.fillRect(0, 0, c.width, c.height)
+    onReady(new THREE.CanvasTexture(c))
+  }
+  img.src = url
+}
+
 function makeGlow(color, size) {
   const c = document.createElement('canvas')
   c.width = c.height = 128
@@ -178,6 +216,76 @@ function makeStarTexture() {
   g.addColorStop(1, 'rgba(255,255,255,0)')
   ctx.fillStyle = g
   ctx.fillRect(0, 0, 64, 64)
+  return new THREE.CanvasTexture(c)
+}
+
+function makeGalaxyTexture(shape, colorHex) {
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const ctx = c.getContext('2d')
+  ctx.clearRect(0, 0, 128, 128)
+  const cx = 64, cy = 64
+
+  if (shape === 'spiral') {
+    for (let arm = 0; arm < 2; arm++) {
+      for (let i = 0; i < 90; i++) {
+        const t = i / 90
+        const angle = t * Math.PI * 3.4 + arm * Math.PI
+        const r = t * 50
+        const x = cx + Math.cos(angle) * r
+        const y = cy + Math.sin(angle) * r * 0.4
+        const rad = 3 + (1 - t) * 5
+        const g = ctx.createRadialGradient(x, y, 0, x, y, rad)
+        g.addColorStop(0, colorHex + 'ff')
+        g.addColorStop(1, colorHex + '00')
+        ctx.fillStyle = g; ctx.fillRect(x - rad*2, y - rad*2, rad*4, rad*4)
+      }
+    }
+    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 16)
+    core.addColorStop(0, 'rgba(255,255,255,1)'); core.addColorStop(1, colorHex + '00')
+    ctx.fillStyle = core; ctx.fillRect(0, 0, 128, 128)
+
+  } else if (shape === 'irregular') {
+    for (let i = 0; i < 55; i++) {
+      const angle = Math.random() * Math.PI * 2
+      const r = Math.random() * 40
+      const x = cx + Math.cos(angle) * r
+      const y = cy + Math.sin(angle) * r * 0.75
+      const rad = 4 + Math.random() * 7
+      const g = ctx.createRadialGradient(x, y, 0, x, y, rad)
+      g.addColorStop(0, colorHex + 'ee')
+      g.addColorStop(1, colorHex + '00')
+      ctx.fillStyle = g; ctx.fillRect(x - rad*2, y - rad*2, rad*4, rad*4)
+    }
+
+  } else if (shape === 'elliptical') {
+    ctx.save()
+    ctx.translate(cx, cy); ctx.scale(1, 0.5); ctx.translate(-cx, -cy)
+    for (let ring = 0; ring < 5; ring++) {
+      const r = 46 - ring * 9
+      const op = Math.max(20, 220 - ring * 40)
+      const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
+      g.addColorStop(0, colorHex + op.toString(16).padStart(2, '0'))
+      g.addColorStop(1, colorHex + '00')
+      ctx.fillStyle = g; ctx.fillRect(cx - r, cy - r, r * 2, r * 2)
+    }
+    ctx.restore()
+
+  } else if (shape === 'ring') {
+    for (let i = 0; i < 90; i++) {
+      const angle = (i / 90) * Math.PI * 2
+      const r = 32 + (Math.random() - 0.5) * 6
+      const x = cx + Math.cos(angle) * r
+      const y = cy + Math.sin(angle) * r * 0.45
+      const g = ctx.createRadialGradient(x, y, 0, x, y, 6)
+      g.addColorStop(0, colorHex + 'ff')
+      g.addColorStop(1, colorHex + '00')
+      ctx.fillStyle = g; ctx.fillRect(x - 12, y - 12, 24, 24)
+    }
+    const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, 10)
+    core.addColorStop(0, 'rgba(255,255,255,0.9)'); core.addColorStop(1, colorHex + '00')
+    ctx.fillStyle = core; ctx.fillRect(0, 0, 128, 128)
+  }
   return new THREE.CanvasTexture(c)
 }
 
@@ -210,6 +318,8 @@ function buildScene(scene) {
   })
   scene.add(new THREE.Mesh(new THREE.SphereGeometry(2500, 32, 32), new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(nc), side: THREE.BackSide })))
 
+  const starTex = makeStarTexture()
+
   const N = 22000
   const sp = new Float32Array(N * 3), sc = new Float32Array(N * 3)
   for (let i = 0; i < N; i++) {
@@ -217,7 +327,6 @@ function buildScene(scene) {
     sp[i*3] = r*Math.sin(ph)*Math.cos(th); sp[i*3+1] = r*Math.sin(ph)*Math.sin(th); sp[i*3+2] = r*Math.cos(ph)
     sc[i*3] = 0.82 + Math.random()*0.18; sc[i*3+1] = 0.85 + (Math.random()-0.5)*0.1; sc[i*3+2] = 0.92 + Math.random()*0.08
   }
-  const starTex = makeStarTexture()
   const sg = new THREE.BufferGeometry()
   sg.setAttribute('position', new THREE.BufferAttribute(sp, 3))
   sg.setAttribute('color', new THREE.BufferAttribute(sc, 3))
@@ -232,16 +341,52 @@ function buildScene(scene) {
   ng.setAttribute('position', new THREE.BufferAttribute(namedPos, 3))
   scene.add(new THREE.Points(ng, new THREE.PointsMaterial({ color: 0xfff8e8, size: 1.6, map: starTex, sizeAttenuation: true, transparent: true, alphaTest: 0.01, opacity: 0.95 })))
 
-  const ap = new Float32Array(2400 * 3)
-  for (let i = 0; i < 2400; i++) {
-    const a = Math.random() * Math.PI * 2, r = 86 + Math.random() * 10
-    ap[i*3] = Math.cos(a)*r; ap[i*3+1] = (Math.random()-0.5)*2; ap[i*3+2] = Math.sin(a)*r
+  const ap = new Float32Array(4000 * 3)
+  for (let i = 0; i < 4000; i++) {
+    const a = Math.random() * Math.PI * 2, r = 225 + Math.random() * 35
+    ap[i*3] = Math.cos(a)*r; ap[i*3+1] = (Math.random()-0.5)*3; ap[i*3+2] = Math.sin(a)*r
   }
   const ag = new THREE.BufferGeometry()
   ag.setAttribute('position', new THREE.BufferAttribute(ap, 3))
-  scene.add(new THREE.Points(ag, new THREE.PointsMaterial({ color: 0x887766, size: 0.28, transparent: true, opacity: 0.7 })))
-}
+  scene.add(new THREE.Points(ag, new THREE.PointsMaterial({ color: 0x998877, size: 0.9, map: starTex, transparent: true, alphaTest: 0.01, opacity: 0.85 })))
 
+  const [gx, gy, gz] = raDecToXYZ(SGR_A.ra, SGR_A.dec, DEEP_SPACE_RADIUS)
+  const bhCanvas = document.createElement('canvas')
+  bhCanvas.width = bhCanvas.height = 128
+  const bhCtx = bhCanvas.getContext('2d')
+  const disk = bhCtx.createRadialGradient(64, 64, 16, 64, 64, 58)
+  disk.addColorStop(0, 'rgba(255,210,140,0.95)')
+  disk.addColorStop(0.3, 'rgba(255,150,60,0.6)')
+  disk.addColorStop(0.65, 'rgba(150,70,20,0.2)')
+  disk.addColorStop(1, 'rgba(0,0,0,0)')
+  bhCtx.fillStyle = disk; bhCtx.fillRect(0, 0, 128, 128)
+  bhCtx.globalCompositeOperation = 'destination-out'
+  const hole = bhCtx.createRadialGradient(64, 64, 0, 64, 64, 15)
+  hole.addColorStop(0, 'rgba(0,0,0,1)')
+  hole.addColorStop(1, 'rgba(0,0,0,0)')
+  bhCtx.fillStyle = hole; bhCtx.fillRect(0, 0, 128, 128)
+  const sgrSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(bhCanvas), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }))
+  sgrSprite.scale.set(70, 70, 1)
+  sgrSprite.position.set(gx, gy, gz)
+  scene.add(sgrSprite)
+
+  REAL_GALAXIES.forEach(g => {
+    const [x, y, z] = raDecToXYZ(g.ra, g.dec, DEEP_SPACE_RADIUS)
+    if (g.texture) {
+      loadFadedTexture(g.texture, (tex) => {
+        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }))
+        sprite.scale.set(g.size, g.size * 0.5625, 1)
+        sprite.position.set(x, y, z)
+        scene.add(sprite)
+      })
+    } else {
+      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGalaxyTexture(g.shape, g.color), transparent: true, depthWrite: false }))
+      sprite.scale.set(g.size, g.size, 1)
+      sprite.position.set(x, y, z)
+      scene.add(sprite)
+    }
+  })
+}
 export default function App() {
   const mountRef = useRef(null)
   const controlsRef = useRef(null)
@@ -273,6 +418,7 @@ export default function App() {
     buildScene(scene)
     const camera = new THREE.PerspectiveCamera(55, window.innerWidth / window.innerHeight, 0.1, 6000)
     const renderer = new THREE.WebGLRenderer({ antialias: true })
+    renderer.domElement.style.touchAction = 'none'
     renderer.setSize(window.innerWidth, window.innerHeight)
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
     renderer.toneMapping = THREE.ACESFilmicToneMapping
@@ -346,11 +492,6 @@ export default function App() {
       return new THREE.Vector3(x, y, z)
     })
 
-    // Full Yale Bright Star Catalog (~9,096 real stars). Loaded async since
-    // it comes from a separate JSON file. Rendered as a dedicated point
-    // cloud, and made clickable via the same on-screen-distance approach
-    // used for the named stars (raycasting against tiny distant points is
-    // unreliable, so we compare projected screen position instead).
     let bscStars = []
     loadBrightStarCatalog().then(stars => {
       const bscTex = makeStarTexture()
@@ -417,13 +558,14 @@ export default function App() {
         const d = Math.hypot(sx - e.clientX, sy - e.clientY)
         if (d < bestDist) { bestDist = d; bestKind = 'bsc'; bestIdx = si }
       })
+
       if (bestKind === 'named') {
         const [name, , , mag, con] = NAMED_STARS[bestIdx]
         setSelected({ name, info: name + ' is a real star, shown at its true position in the sky as seen from Earth.', stats: { Type: 'Star', 'Apparent Mag': mag, Constellation: con } })
         controls.animateTo(namedStarPositions[bestIdx].clone(), 30); setIsZoomed(true)
         return
       }
-            if (bestKind === 'bsc') {
+      if (bestKind === 'bsc') {
         const s = bscStars[bestIdx]
         const cls = (s.spectral || '').trim().charAt(0).toUpperCase()
         const desc = {
@@ -439,7 +581,6 @@ export default function App() {
         controls.animateTo(s.position.clone(), 30); setIsZoomed(true)
         return
       }
-
       setSelected(null); controls.reset(); setIsZoomed(false)
     }
 
@@ -486,23 +627,25 @@ export default function App() {
       <div ref={mountRef} style={{ width:'100%', height:'100%', position:'absolute', inset:0 }} />
       <div style={{ position:'absolute', inset:0, background:'#02030f', transition:'opacity 1.4s ease', opacity: ready ? 0 : 1, pointerEvents:'none', zIndex:50 }} />
 
+      {!page && (
       <header style={{ position:'absolute', top:0, left:0, right:0, zIndex:20, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', rowGap:'8px', padding:'12px clamp(10px,4vw,28px)', background:'linear-gradient(to bottom, rgba(2,3,15,0.96) 55%, transparent)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
-          <span style={{ color:'#7ba4ff', fontSize:'1.2rem' }}>✦</span>
+          <span style={{ fontSize:'1.15rem' }}>☄️</span>
           <span style={{ color:'#fff', fontSize:'1.15rem', fontWeight:300, letterSpacing:'0.28em', fontFamily:'Georgia, serif' }}>ASTROTRIP</span>
         </div>
         <nav style={{ display:'flex', gap:'4px', alignItems:'center', flexWrap:'wrap' }}>
           <button style={nb()} onClick={() => { setPage(null); closePanel() }}>Explorer</button>
           <button style={nb(page === 'article')}  onClick={() => { setPage('article');  setSelected(null) }}>Articles</button>
-          <button style={nb(page === 'research')} onClick={() => { setPage('research'); setSelected(null) }}>Research</button>
           <button style={nb(page === 'game')} onClick={() => { setPage('game'); setSelected(null) }}>Game</button>
+          <button style={nb(page === 'tonight')} onClick={() => { setPage('tonight'); setSelected(null) }}>Tonight</button>
           <button style={{ ...nb(showFavs), fontSize:'1rem', padding:'clamp(5px,1.5vw,7px) clamp(8px,2.5vw,12px)', display:'flex', alignItems:'center', gap:'5px' }} onClick={() => setShowFavs(v => !v)}>
             ★{favorites.length > 0 && <span style={{ background:'#5577ff', color:'#fff', borderRadius:'10px', fontSize:'0.68rem', padding:'1px 5px', fontWeight:600 }}>{favorites.length}</span>}
           </button>
         </nav>
       </header>
+      )}
 
-      {(page === 'article' || page === 'research') && (
+      {page === 'article' && (
         <div style={{ position:'absolute', inset:0, zIndex:15, background:'rgba(2,3,15,0.82)', backdropFilter:'blur(2px)' }}>
           <div style={{ width:'100%', height:'100%' }} className="page-scrollable">
             <PostsPage type={page} onBack={() => setPage(null)} />
@@ -514,6 +657,14 @@ export default function App() {
         <div style={{ position:'absolute', inset:0, zIndex:15, background:'rgba(2,3,15,0.82)', backdropFilter:'blur(2px)' }}>
           <div style={{ width:'100%', height:'100%' }} className="page-scrollable">
             <GamesMenu onBack={() => setPage(null)} />
+          </div>
+        </div>
+      )}
+
+      {page === 'tonight' && (
+        <div style={{ position:'absolute', inset:0, zIndex:15, background:'rgba(2,3,15,0.82)', backdropFilter:'blur(2px)' }}>
+          <div style={{ width:'100%', height:'100%' }} className="page-scrollable">
+            <TonightSky onBack={() => setPage(null)} />
           </div>
         </div>
       )}
