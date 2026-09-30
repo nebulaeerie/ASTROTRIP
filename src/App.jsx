@@ -98,26 +98,36 @@ function makeControls(camera, el) {
     update()
   }
   function onPU() { down = false }
+
   function onW(e) {
   e.preventDefault()
 
+  // Ctrl + scroll → zoom. Plain scroll → pan.
+  if (!e.ctrlKey) {
+    const panSpeed = 0.6
+    const forward = camera.getWorldDirection(new THREE.Vector3())
+    const right = new THREE.Vector3().crossVectors(camera.up, forward).normalize()
+    const up = new THREE.Vector3().crossVectors(forward, right).normalize()
+    target.add(right.multiplyScalar(e.deltaX * panSpeed))
+    target.add(up.multiplyScalar(e.deltaY * panSpeed))
+    update()
+    return
+  }
+
+  // Zoom (cursor-aware)
   const factor = Math.exp(e.deltaY * 0.001)
   const newR = Math.max(3, Math.min(950, sph.r * factor))
 
-  // Cursor position in normalized device coords (-1 to 1)
   const rect = el.getBoundingClientRect()
   const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1
   const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1
 
-  // Ray from camera through the cursor
   const raycaster = new THREE.Raycaster()
   raycaster.setFromCamera(new THREE.Vector2(nx, ny), camera)
 
-  // Point on that ray at the current distance and at the new distance
   const currentPoint = raycaster.ray.at(sph.r, new THREE.Vector3())
   const newPoint = raycaster.ray.at(newR, new THREE.Vector3())
 
-  // Shift the target so we're heading toward whatever is under the cursor
   const delta = currentPoint.clone().sub(newPoint)
   target.add(delta.multiplyScalar(0.85))
 
@@ -128,22 +138,71 @@ function makeControls(camera, el) {
     if (e.touches.length === 1) { lx = e.touches[0].clientX; ly = e.touches[0].clientY; dragged = false }
     if (e.touches.length === 2) ptDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
   }
-  function onTM(e) {
-    if (e.touches.length === 1) {
-      const dx = e.touches[0].clientX - lx, dy = e.touches[0].clientY - ly
-      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragged = true
-      sph.theta -= dx * 0.004
-      sph.phi = Math.max(0.08, Math.min(Math.PI - 0.08, sph.phi + dy * 0.004))
-      lx = e.touches[0].clientX; ly = e.touches[0].clientY
-      update()
-    }
-    if (e.touches.length === 2 && ptDist !== null) {
-      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
-      sph.r = Math.max(28, Math.min(950, sph.r - (d - ptDist) * 0.5))
-      ptDist = d; update()
-    }
+  let lastMid = null
+
+function onTM(e) {
+  // One finger: rotate
+  if (e.touches.length === 1) {
+    const dx = e.touches[0].clientX - lx, dy = e.touches[0].clientY - ly
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragged = true
+    sph.theta -= dx * 0.004
+    sph.phi = Math.max(0.08, Math.min(Math.PI - 0.08, sph.phi + dy * 0.004))
+    lx = e.touches[0].clientX; ly = e.touches[0].clientY
+    update()
+    lastMid = null
+    return
   }
-  function onTE() { ptDist = null }
+
+  // Two fingers: pinch → zoom, drag → pan
+  if (e.touches.length === 2) {
+    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2
+    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2
+
+    // Pinch zoom
+    if (ptDist !== null) {
+      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
+      if (Math.abs(d - ptDist) > 4) {
+        const factor = ptDist / d
+        const newR = Math.max(3, Math.min(950, sph.r * factor))
+
+        const rect = el.getBoundingClientRect()
+        const nx = ((midX - rect.left) / rect.width) * 2 - 1
+        const ny = -((midY - rect.top) / rect.height) * 2 + 1
+
+        const raycaster = new THREE.Raycaster()
+        raycaster.setFromCamera(new THREE.Vector2(nx, ny), camera)
+
+        const currentPoint = raycaster.ray.at(sph.r, new THREE.Vector3())
+        const newPoint = raycaster.ray.at(newR, new THREE.Vector3())
+
+        const delta = currentPoint.clone().sub(newPoint)
+        target.add(delta.multiplyScalar(0.85))
+
+        sph.r = newR
+        update()
+      }
+      ptDist = d
+    }
+
+    // Pan: shift target by the change in midpoint
+    if (lastMid !== null) {
+      const dx = midX - lastMid.x
+      const dy = midY - lastMid.y
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        const panSpeed = 0.3
+        const forward = camera.getWorldDirection(new THREE.Vector3())
+        const right = new THREE.Vector3().crossVectors(camera.up, forward).normalize()
+        const up = new THREE.Vector3().crossVectors(forward, right).normalize()
+        target.add(right.multiplyScalar(-dx * panSpeed))
+        target.add(up.multiplyScalar(dy * panSpeed))
+        update()
+      }
+    }
+    lastMid = { x: midX, y: midY }
+    dragged = true
+  }
+}
+  function onTE() { ptDist = null; lastMid = null }
 
   el.addEventListener('pointerdown', onPD)
   window.addEventListener('pointermove', onPM)
@@ -726,6 +785,12 @@ export default function App() {
               <div key={f} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid rgba(100,140,255,0.08)' }}>
                 <span style={{ color:'rgba(195,215,255,0.8)', fontSize:'0.83rem' }}>{f}</span>
                 <button onClick={() => toggleFav(f)} style={{ background:'transparent', border:'none', color:'rgba(140,170,255,0.35)', cursor:'pointer', fontSize:'0.78rem', padding:'2px 6px' }}>✕</button>
+                <button
+  onClick={() => setPanMode(p => !p)}
+  style={{ position:'absolute', bottom:'20px', right:'20px', zIndex:20, background:'rgba(4,6,26,0.85)', border:'1px solid rgba(100,140,255,0.3)', color:'#c8d8ff', borderRadius:'8px', padding:'8px 12px', fontSize:'0.78rem', cursor:'pointer' }}
+>
+  {panMode ? '✥ Pan' : '⤢ Zoom'}
+</button>
               </div>
             ))}
         </div>

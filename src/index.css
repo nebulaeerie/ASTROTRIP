@@ -76,3 +76,27 @@ html, body {
   overscroll-behavior: none;
   touch-action: manipulation;
 }
+
+.article-img {
+  display: block;
+  border-radius: 10px;
+  margin: 20px 0;
+}
+.article-img.small { width: 40%; margin-left: auto; margin-right: auto; }
+.article-img.medium { width: 70%; margin-left: auto; margin-right: auto; }
+.article-img.large { width: 100%; }
+
+.article-figure {
+  margin: 20px 0;
+}
+.article-figure img {
+  width: 100%;
+  border-radius: 10px;
+  display: block;
+}
+.article-figure figcaption {
+  font-size: 0.8rem;
+  color: #8b95b8;
+  text-align: center;
+  margin-top: 8px;
+}

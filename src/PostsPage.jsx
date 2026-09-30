@@ -26,13 +26,13 @@ function PostCard({ post, lang, onClick }) {
   aspectRatio: '1 / 1',
   overflow: 'hidden'
 }}>
-    <img
+        <img
       src={post.cover_image}
       alt={title}
       style={{
         width: '100%',
-        height: 'auto',
-        objectFit: 'contain',
+        height: '100%',
+        objectFit: 'cover',
         display: 'block'
       }}
     />
