@@ -140,7 +140,7 @@ export default function PostsPage({ type, onBack }) {
   const [lang, setLang] = useState(LANGUAGES[0])
   const [showLangMenu, setShowLangMenu] = useState(false)
   const [selected, setSelected] = useState(null)
-  const meta = META[type]
+  const meta = META[type] || META.article
 
   useEffect(() => {
     async function load() {

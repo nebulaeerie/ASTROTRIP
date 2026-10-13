@@ -17,7 +17,6 @@ export const CITIES = [
   { name: 'Rome',          country: 'Italy', latitude: 41.9028, longitude: 12.4964 },
   { name: 'Amsterdam',     country: 'Netherlands', latitude: 52.3676, longitude: 4.9041 },
   { name: 'Stockholm',     country: 'Sweden', latitude: 59.3293, longitude: 18.0686 },
-  { name: 'Moscow',        country: 'Russia', latitude: 55.7558, longitude: 37.6173 },
   { name: 'Istanbul',      country: 'Turkey', latitude: 41.0082, longitude: 28.9784 },
   { name: 'Cairo',         country: 'Egypt', latitude: 30.0444, longitude: 31.2357 },
   { name: 'Lagos',         country: 'Nigeria', latitude: 6.5244, longitude: 3.3792 },
@@ -115,5 +114,7 @@ export const CITIES = [
   { name: 'Honolulu',       country: 'United States', latitude: 21.304547, longitude: -157.855676},
   { name: 'Sarajevo',       country: 'Bosnia and Herzegovina', latitude: 43.8570713, longitude: 18.4126147},
   { name: 'Tirana',         country: 'Albania', latitude: 41.3281482, longitude: 19.8184435},
+  { name: 'Nuuk',           country: 'Greenland', latitude: 64.1767049, longitude: -51.7361444}, 
+  { name: 'Caracas',        country: 'Venezuela', latitude: 10.5060934, longitude: -66.9146008},
 
 ];

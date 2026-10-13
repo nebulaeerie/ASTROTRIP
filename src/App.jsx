@@ -4,6 +4,8 @@ import * as THREE from 'three'
 import PostsPage from './PostsPage'
 import GamesMenu from './GamesMenu'
 import { loadBrightStarCatalog } from './starData'
+import SkyView from './SkyView'
+import SearchBar from './SearchBar'
 
 const BODIES = [
   { name: 'Sun',     texture: '/2k_sun.jpg',           fallback: 0xffdd00, size: 16,  distance: 0,   speed: 0,       emissive: true,  glowColor: '#ffaa00', glowSize: 1.35, info: 'The Sun contains 99.86% of the Solar System mass. Core temperature reaches 15 million degrees.', stats: { Type: 'G-type Star', Diameter: '1,392,700 km', 'Surface Temp': '5,500 C', Age: '4.6 billion yrs' } },
@@ -13,7 +15,7 @@ const BODIES = [
   { name: 'Mars',    texture: '/2k_mars.jpg',            fallback: 0xcc4400, size: 3,   distance: 72,  speed: 0.0006,               glowColor: '#ff6622', glowSize: 1.12, info: 'Mars hosts Olympus Mons, the Solar System tallest volcano at 22 km high.',                        stats: { Type: 'Terrestrial',  Diameter: '6,779 km',     Distance: '227.9M km',   Moons: '2' } },
   { name: 'Jupiter', texture: '/2k_jupiter.jpg',         fallback: 0xcc9966, size: 12,  distance: 105, speed: 0.00035,                                          info: 'Jupiter Great Red Spot is a storm larger than Earth, raging for over 350 years.',                 stats: { Type: 'Gas Giant',    Diameter: '139,820 km',   Distance: '778.5M km',   Moons: '95' } },
   { name: 'Saturn',  texture: '/2k_saturn.jpg',          fallback: 0xddcc88, size: 10,  distance: 140, speed: 0.00022, hasRing: true,                           info: 'Saturn rings span 282,000 km but are only about 10 metres thick.',                                  stats: { Type: 'Gas Giant',    Diameter: '116,460 km',   Distance: '1.43B km',    Moons: '146' } },
-  { name: 'Uranus',  texture: '/2k_uranus.jpg',          fallback: 0x88dddd, size: 7,   distance: 172, speed: 0.00013,              glowColor: '#88ffee', glowSize: 1.1,  info: 'Uranus rotates on its side with a 98 degree axial tilt from an ancient collision.',              stats: { Type: 'Ice Giant',    Diameter: '50,724 km',    Distance: '2.87B km',    Moons: '28' } },
+  { name: 'Uranus',  texture: '/2k_uranus_new.jpg',          fallback: 0x88dddd, size: 7,   distance: 172, speed: 0.00013,                                       glowColor: '#88ffee', glowSize: 1.05,  info: 'Uranus rotates on its side with a 98 degree axial tilt from an ancient collision.',              stats: { Type: 'Ice Giant',    Diameter: '50,724 km',    Distance: '2.87B km',    Moons: '28' } },
   { name: 'Neptune', texture: '/2k_neptune.jpg',         fallback: 0x3355ff, size: 6.5, distance: 200, speed: 0.00008,              glowColor: '#3366ff', glowSize: 1.1,  info: 'Neptune has the fastest winds in the Solar System at up to 2,100 km per hour.',                  stats: { Type: 'Ice Giant',    Diameter: '49,244 km',    Distance: '4.50B km',    Moons: '16' } },
 ]
 
@@ -24,11 +26,11 @@ const MOON_INFO = {
 }
 
 const GALILEAN = [
-  { name: 'Io',       color: 0xffcc44, size: 0.9,  orbitR: 17, speed: 0.003 },
-  { name: 'Europa',   color: 0xbbddff, size: 0.75, orbitR: 21, speed: 0.0022 },
-  { name: 'Ganymede', color: 0xaa9988, size: 1.1,  orbitR: 26, speed: 0.0015 },
-  { name: 'Callisto', color: 0x887766, size: 1.0,  orbitR: 32, speed: 0.001 },
-]
+  { name: 'Io',       color: 0xffcc44, texture: '/io.jpg',       size: 0.9,  orbitR: 17, speed: 0.0006 },
+  { name: 'Europa',   color: 0xbbddff, texture: '/europa.jpg',   size: 0.75, orbitR: 21, speed: 0.00044 },
+  { name: 'Ganymede', color: 0xaa9988, texture: '/ganymede.jpg', size: 1.1,  orbitR: 26, speed: 0.0003 },
+  { name: 'Callisto', color: 0x887766, texture: '/callisto.jpg', size: 1.0,  orbitR: 32, speed: 0.0002 },
+];
 
 const NAMED_STARS = [
   ['Sirius', 6.75, -16.72, -1.46, 'Canis Major'], ['Canopus', 6.40, -52.70, -0.74, 'Carina'],
@@ -61,148 +63,154 @@ const NAMED_STARS = [
 
 const DEEP_SPACE_RADIUS = 2450
 
-const REAL_GALAXIES = [
-  { name: 'Andromeda Galaxy (M31)', ra: 0.71, dec: 41.27, texture: '/galaxy_andromeda.jpg', size: 90, info: 'The nearest large spiral galaxy to the Milky Way, containing roughly one trillion stars. It is on a collision course with our own galaxy, expected to merge in about 4.5 billion years.', stats: { Type: 'Spiral Galaxy', Distance: '2.5 million ly', Diameter: '220,000 ly' } },
-  { name: "Bode's Galaxy (M81)", ra: 9.93, dec: 69.07, texture: '/galaxy_m81.jpg', size: 80, info: 'One of the brightest galaxies visible from Earth, with a nearly perfect spiral structure and a supermassive black hole at its core.', stats: { Type: 'Spiral Galaxy', Distance: '12 million ly', Diameter: '90,000 ly' } },
-  { name: 'Sombrero Galaxy (M104)', ra: 12.67, dec: -11.62, texture: '/galaxy_sombrero.jpg', size: 70, info: 'Named for its resemblance to a wide-brimmed hat, with a bright bulge and a prominent dust lane surrounding a large central black hole.', stats: { Type: 'Spiral (unbarred)', Distance: '29 million ly', Diameter: '50,000 ly' } },
-  { name: 'Cigar Galaxy (M82)', ra: 9.93, dec: 69.68, texture: '/galaxy_m82.jpg', size: 60, info: "A starburst galaxy forming stars at a rate 10 times faster than the Milky Way, distorted by gravitational interaction with its neighbor M81.", stats: { Type: 'Starburst Galaxy', Distance: '12 million ly', Diameter: '37,000 ly' } },
-  { name: 'Large Magellanic Cloud', ra: 5.40, dec: -69.75, color: '#ffe4c4', shape: 'irregular', size: 40, info: 'A dwarf galaxy and satellite of the Milky Way, visible to the naked eye from the Southern Hemisphere.', stats: { Type: 'Irregular Dwarf Galaxy', Distance: '160,000 ly', Diameter: '14,000 ly' } },
-  { name: 'Small Magellanic Cloud', ra: 0.88, dec: -72.83, color: '#ffd8a8', shape: 'irregular', size: 30, info: 'A smaller companion dwarf galaxy to the Large Magellanic Cloud, also orbiting the Milky Way.', stats: { Type: 'Irregular Dwarf Galaxy', Distance: '200,000 ly', Diameter: '7,000 ly' } },
-]
-
-const SGR_A = { name: 'Sagittarius A*', ra: 17.75, dec: -29.0, info: 'The supermassive black hole at the center of the Milky Way, about 4.3 million times the mass of the Sun. The Event Horizon Telescope captured the first image of it in 2022.', stats: { Type: 'Supermassive Black Hole', Distance: '26,000 ly (galactic center)', Mass: '~4.3 million Suns' } }
-
 function makeControls(camera, el) {
+  const target = new THREE.Vector3(0, 0, 0)
   let sph = { theta: Math.PI / 5, phi: Math.PI / 3.2, r: 300 }
-    const target = new THREE.Vector3()
-  let down = false, dragged = false, lx = 0, ly = 0, ptDist = null
+  const MIN_R = 1.5
+  const MAX_R = 20000
+
+  let down = false, dragged = false, lx = 0, ly = 0
+  let ptDist = null
+  let lastMid = null
+
+  let velTheta = 0
+  let velPhi = 0
+  const MOMENTUM_DECAY = 0.93
+  const MOMENTUM_MIN = 0.00008
+
+  let anim = null
 
   function update() {
+    const sinPhi = Math.sin(sph.phi)
     camera.position.set(
-      target.x + sph.r * Math.sin(sph.phi) * Math.sin(sph.theta),
+      target.x + sph.r * sinPhi * Math.sin(sph.theta),
       target.y + sph.r * Math.cos(sph.phi),
-      target.z + sph.r * Math.sin(sph.phi) * Math.cos(sph.theta)
+      target.z + sph.r * sinPhi * Math.cos(sph.theta)
     )
     camera.lookAt(target)
   }
   update()
 
-  function onPD(e) { down = true; dragged = false; lx = e.clientX; ly = e.clientY }
-  function onPM(e) {
-    if (!down) return
-    const dx = e.clientX - lx, dy = e.clientY - ly
-    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragged = true
-    sph.theta -= dx * 0.004
-    sph.phi = Math.max(0.08, Math.min(Math.PI - 0.08, sph.phi + dy * 0.004))
-    lx = e.clientX; ly = e.clientY
-    update()
+  function rotate(dTheta, dPhi) {
+    sph.theta += dTheta
+    sph.phi = Math.max(0.05, Math.min(Math.PI - 0.05, sph.phi + dPhi))
   }
-  function onPU() { down = false }
 
-  function onW(e) {
-  e.preventDefault()
+  function zoom(factor) {
+    sph.r = Math.max(MIN_R, Math.min(MAX_R, sph.r * factor))
+  }
 
-  // Ctrl + scroll → zoom. Plain scroll → pan.
-  if (!e.ctrlKey) {
-    const panSpeed = 0.6
+  function pan(dxPixels, dyPixels) {
+    const fovRad = (camera.fov * Math.PI) / 180
+    const worldHeight = 2 * Math.tan(fovRad / 2) * sph.r
+    const scale = worldHeight / el.clientHeight
     const forward = camera.getWorldDirection(new THREE.Vector3())
     const right = new THREE.Vector3().crossVectors(camera.up, forward).normalize()
     const up = new THREE.Vector3().crossVectors(forward, right).normalize()
-    target.add(right.multiplyScalar(e.deltaX * panSpeed))
-    target.add(up.multiplyScalar(e.deltaY * panSpeed))
-    update()
-    return
+    target.addScaledVector(right, -dxPixels * scale)
+    target.addScaledVector(up, dyPixels * scale)
   }
 
-  // Zoom (cursor-aware)
-  const factor = Math.exp(e.deltaY * 0.001)
-  const newR = Math.max(3, Math.min(950, sph.r * factor))
-
-  const rect = el.getBoundingClientRect()
-  const nx = ((e.clientX - rect.left) / rect.width) * 2 - 1
-  const ny = -((e.clientY - rect.top) / rect.height) * 2 + 1
-
-  const raycaster = new THREE.Raycaster()
-  raycaster.setFromCamera(new THREE.Vector2(nx, ny), camera)
-
-  const currentPoint = raycaster.ray.at(sph.r, new THREE.Vector3())
-  const newPoint = raycaster.ray.at(newR, new THREE.Vector3())
-
-  const delta = currentPoint.clone().sub(newPoint)
-  target.add(delta.multiplyScalar(0.85))
-
-  sph.r = newR
-  update()
-}
-  function onTS(e) {
-    if (e.touches.length === 1) { lx = e.touches[0].clientX; ly = e.touches[0].clientY; dragged = false }
-    if (e.touches.length === 2) ptDist = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
+  function onPD(e) {
+    down = true
+    dragged = false
+    lx = e.clientX
+    ly = e.clientY
+    velTheta = 0
+    velPhi = 0
+    anim = null
   }
-  let lastMid = null
 
-function onTM(e) {
-  // One finger: rotate
-  if (e.touches.length === 1) {
-    const dx = e.touches[0].clientX - lx, dy = e.touches[0].clientY - ly
+  function onPM(e) {
+    if (!down) return
+    const dx = e.clientX - lx
+    const dy = e.clientY - ly
     if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragged = true
-    sph.theta -= dx * 0.004
-    sph.phi = Math.max(0.08, Math.min(Math.PI - 0.08, sph.phi + dy * 0.004))
-    lx = e.touches[0].clientX; ly = e.touches[0].clientY
+
+    const dTheta = -dx * 0.004
+    const dPhi = dy * 0.004
+    rotate(dTheta, dPhi)
+    velTheta = dTheta
+    velPhi = dPhi
+
+    lx = e.clientX
+    ly = e.clientY
     update()
+  }
+
+  function onPU() { down = false }
+
+  function onW(e) {
+    e.preventDefault()
+    const factor = Math.exp(e.deltaY * 0.0012)
+    zoom(factor)
+    anim = null
+    update()
+  }
+
+  function onTS(e) {
+    if (e.touches.length === 1) {
+      lx = e.touches[0].clientX
+      ly = e.touches[0].clientY
+      dragged = false
+    }
+    if (e.touches.length === 2) {
+      ptDist = Math.hypot(
+        e.touches[0].clientX - e.touches[1].clientX,
+        e.touches[0].clientY - e.touches[1].clientY
+      )
+      lastMid = {
+        x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+        y: (e.touches[0].clientY + e.touches[1].clientY) / 2,
+      }
+    }
+  }
+
+  function onTM(e) {
+    if (e.touches.length === 1) {
+      const dx = e.touches[0].clientX - lx
+      const dy = e.touches[0].clientY - ly
+      if (Math.abs(dx) > 2 || Math.abs(dy) > 2) dragged = true
+      const dTheta = -dx * 0.004
+      const dPhi = dy * 0.004
+      rotate(dTheta, dPhi)
+      velTheta = dTheta
+      velPhi = dPhi
+      lx = e.touches[0].clientX
+      ly = e.touches[0].clientY
+      update()
+      lastMid = null
+      return
+    }
+
+    if (e.touches.length === 2) {
+      const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2
+      const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2
+
+      if (ptDist !== null) {
+        const d = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        )
+        if (Math.abs(d - ptDist) > 2) zoom(ptDist / d)
+        ptDist = d
+      }
+
+      if (lastMid !== null) {
+        const dx = midX - lastMid.x
+        const dy = midY - lastMid.y
+        if (Math.abs(dx) > 1 || Math.abs(dy) > 1) pan(dx, dy)
+      }
+      lastMid = { x: midX, y: midY }
+      dragged = true
+      update()
+    }
+  }
+
+  function onTE() {
+    ptDist = null
     lastMid = null
-    return
   }
-
-  // Two fingers: pinch → zoom, drag → pan
-  if (e.touches.length === 2) {
-    const midX = (e.touches[0].clientX + e.touches[1].clientX) / 2
-    const midY = (e.touches[0].clientY + e.touches[1].clientY) / 2
-
-    // Pinch zoom
-    if (ptDist !== null) {
-      const d = Math.hypot(e.touches[0].clientX - e.touches[1].clientX, e.touches[0].clientY - e.touches[1].clientY)
-      if (Math.abs(d - ptDist) > 4) {
-        const factor = ptDist / d
-        const newR = Math.max(3, Math.min(950, sph.r * factor))
-
-        const rect = el.getBoundingClientRect()
-        const nx = ((midX - rect.left) / rect.width) * 2 - 1
-        const ny = -((midY - rect.top) / rect.height) * 2 + 1
-
-        const raycaster = new THREE.Raycaster()
-        raycaster.setFromCamera(new THREE.Vector2(nx, ny), camera)
-
-        const currentPoint = raycaster.ray.at(sph.r, new THREE.Vector3())
-        const newPoint = raycaster.ray.at(newR, new THREE.Vector3())
-
-        const delta = currentPoint.clone().sub(newPoint)
-        target.add(delta.multiplyScalar(0.85))
-
-        sph.r = newR
-        update()
-      }
-      ptDist = d
-    }
-
-    // Pan: shift target by the change in midpoint
-    if (lastMid !== null) {
-      const dx = midX - lastMid.x
-      const dy = midY - lastMid.y
-      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-        const panSpeed = 0.3
-        const forward = camera.getWorldDirection(new THREE.Vector3())
-        const right = new THREE.Vector3().crossVectors(camera.up, forward).normalize()
-        const up = new THREE.Vector3().crossVectors(forward, right).normalize()
-        target.add(right.multiplyScalar(-dx * panSpeed))
-        target.add(up.multiplyScalar(dy * panSpeed))
-        update()
-      }
-    }
-    lastMid = { x: midX, y: midY }
-    dragged = true
-  }
-}
-  function onTE() { ptDist = null; lastMid = null }
 
   el.addEventListener('pointerdown', onPD)
   window.addEventListener('pointermove', onPM)
@@ -212,29 +220,78 @@ function onTM(e) {
   el.addEventListener('touchmove', onTM, { passive: true })
   el.addEventListener('touchend', onTE)
 
-  function animateTo(toTarget, toR) {
-    const from = { ...sph }, fromT = target.clone()
-    const off = camera.position.clone().sub(toTarget)
-    let toTheta = Math.atan2(off.x, off.z)
-    let toPhi = Math.max(0.3, Math.min(Math.PI - 0.3, Math.atan2(Math.sqrt(off.x**2 + off.z**2), off.y)))
-    let dTheta = toTheta - from.theta
+  function animateTo(newTarget, arg2, arg3) {
+    let options = {}
+    if (typeof arg2 === 'number') {
+      options.distance = arg2
+      if (typeof arg3 === 'number') options.fov = arg3
+    } else if (arg2 && typeof arg2 === 'object') {
+      options = arg2
+    }
+
+    const toTarget = newTarget.clone()
+    let toR = options.distance ?? sph.r
+    let toTheta = sph.theta
+    let toPhi = sph.phi
+    const toFov = options.fov ?? camera.fov
+
+    if (options.cameraAt) {
+      const off = options.cameraAt.clone().sub(toTarget)
+      toR = Math.max(0.5, off.length())
+      toTheta = Math.atan2(off.x, off.z)
+      toPhi = Math.acos(Math.max(-1, Math.min(1, off.y / toR)))
+    }
+
+    let dTheta = toTheta - sph.theta
     if (dTheta > Math.PI) dTheta -= 2 * Math.PI
     if (dTheta < -Math.PI) dTheta += 2 * Math.PI
-    const t0 = performance.now(), dur = 1100
-    function tick() {
-      const t = Math.min((performance.now() - t0) / dur, 1)
-      const e = 1 - Math.pow(1 - t, 4)
-      sph.r = from.r + (toR - from.r) * e
-      sph.theta = from.theta + dTheta * e
-      sph.phi = from.phi + (toPhi - from.phi) * e
-      target.lerpVectors(fromT, toTarget, e)
-      update()
-      if (t < 1) requestAnimationFrame(tick)
+    toTheta = sph.theta + dTheta
+
+    anim = {
+      fromTarget: target.clone(),
+      fromR: sph.r,
+      fromTheta: sph.theta,
+      fromPhi: sph.phi,
+      fromFov: camera.fov,
+      toTarget,
+      toR,
+      toTheta,
+      toPhi,
+      toFov,
+      t0: performance.now(),
+      dur: options.duration ?? 1200,
     }
-    tick()
   }
 
-  function reset() { animateTo(new THREE.Vector3(0, 0, 0), 300) }
+  function reset() {
+    animateTo(new THREE.Vector3(0, 0, 0), { distance: 300, fov: 55 })
+  }
+
+  function tick() {
+    let needsUpdate = false
+
+    if (anim) {
+      const t = Math.min((performance.now() - anim.t0) / anim.dur, 1)
+      const e = 1 - Math.pow(1 - t, 4)
+      target.lerpVectors(anim.fromTarget, anim.toTarget, e)
+      sph.r = anim.fromR + (anim.toR - anim.fromR) * e
+      sph.theta = anim.fromTheta + (anim.toTheta - anim.fromTheta) * e
+      sph.phi = anim.fromPhi + (anim.toPhi - anim.fromPhi) * e
+      camera.fov = anim.fromFov + (anim.toFov - anim.fromFov) * e
+      camera.updateProjectionMatrix()
+      needsUpdate = true
+      if (t >= 1) anim = null
+    }
+
+    if (!down && (Math.abs(velTheta) > MOMENTUM_MIN || Math.abs(velPhi) > MOMENTUM_MIN)) {
+      rotate(velTheta, velPhi)
+      velTheta *= MOMENTUM_DECAY
+      velPhi *= MOMENTUM_DECAY
+      needsUpdate = true
+    }
+
+    if (needsUpdate) update()
+  }
 
   function dispose() {
     el.removeEventListener('pointerdown', onPD)
@@ -246,7 +303,14 @@ function onTM(e) {
     el.removeEventListener('touchend', onTE)
   }
 
-  return { isDragged: () => dragged, animateTo, reset, dispose }
+  return {
+    isDragged: () => dragged,
+    animateTo,
+    reset,
+    dispose,
+    tick,
+    getTarget: () => target.clone(),
+  }
 }
 
 function loadFadedTexture(url, onReady) {
@@ -283,6 +347,46 @@ function makeGlow(color, size) {
   const s = new THREE.Sprite(mat)
   s.scale.setScalar(size)
   return s
+}
+
+function makeSaturnRingTexture() {
+  const c = document.createElement('canvas')
+  c.width = 1024
+  c.height = 64
+  const ctx = c.getContext('2d')
+
+  const base = ctx.createLinearGradient(0, 0, c.width, 0)
+  base.addColorStop(0.00, 'rgba(200,190,165,0.08)')
+  base.addColorStop(0.08, 'rgba(210,195,165,0.30)')
+  base.addColorStop(0.20, 'rgba(230,215,180,0.85)')
+  base.addColorStop(0.40, 'rgba(235,220,185,0.95)')
+  base.addColorStop(0.55, 'rgba(200,185,155,0.55)')
+  base.addColorStop(0.62, 'rgba(220,205,170,0.80)')
+  base.addColorStop(0.80, 'rgba(210,195,160,0.70)')
+  base.addColorStop(0.92, 'rgba(180,170,145,0.35)')
+  base.addColorStop(1.00, 'rgba(150,140,120,0.05)')
+  ctx.fillStyle = base
+  ctx.fillRect(0, 0, c.width, c.height)
+
+  const cassini = ctx.createLinearGradient(c.width * 0.52, 0, c.width * 0.58, 0)
+  cassini.addColorStop(0, 'rgba(0,0,0,0)')
+  cassini.addColorStop(0.4, 'rgba(20,15,10,0.35)')
+  cassini.addColorStop(0.6, 'rgba(20,15,10,0.35)')
+  cassini.addColorStop(1, 'rgba(0,0,0,0)')
+  ctx.fillStyle = cassini
+  ctx.fillRect(c.width * 0.52, 0, c.width * 0.06, c.height)
+
+  const img = ctx.getImageData(0, 0, c.width, c.height)
+  const data = img.data
+  for (let i = 0; i < data.length; i += 4) {
+    const n = (Math.random() - 0.5) * 35
+    data[i] = Math.max(0, Math.min(255, data[i] + n))
+    data[i + 1] = Math.max(0, Math.min(255, data[i + 1] + n))
+    data[i + 2] = Math.max(0, Math.min(255, data[i + 2] + n))
+  }
+  ctx.putImageData(img, 0, 0)
+
+  return new THREE.CanvasTexture(c)
 }
 
 function makeStarTexture() {
@@ -418,7 +522,8 @@ function buildScene(scene) {
   })
   const ng = new THREE.BufferGeometry()
   ng.setAttribute('position', new THREE.BufferAttribute(namedPos, 3))
-  scene.add(new THREE.Points(ng, new THREE.PointsMaterial({ color: 0xfff8e8, size: 1.6, map: starTex, sizeAttenuation: true, transparent: true, alphaTest: 0.01, opacity: 0.95 })))
+  // FIXED: named stars are 4px, sizeAttenuation false so they stay visible up close
+  scene.add(new THREE.Points(ng, new THREE.PointsMaterial({ color: 0xfff8e8, size: 4, map: starTex, sizeAttenuation: false, transparent: true, alphaTest: 0.01, opacity: 0.95 })))
 
   const ap = new Float32Array(4000 * 3)
   for (let i = 0; i < 4000; i++) {
@@ -427,51 +532,25 @@ function buildScene(scene) {
   }
   const ag = new THREE.BufferGeometry()
   ag.setAttribute('position', new THREE.BufferAttribute(ap, 3))
+  // FIXED: use ag (asteroid belt geometry) with its own material, and close buildScene properly
   scene.add(new THREE.Points(ag, new THREE.PointsMaterial({ color: 0x998877, size: 0.9, map: starTex, transparent: true, alphaTest: 0.01, opacity: 0.85 })))
-
-  const [gx, gy, gz] = raDecToXYZ(SGR_A.ra, SGR_A.dec, DEEP_SPACE_RADIUS)
-  const bhCanvas = document.createElement('canvas')
-  bhCanvas.width = bhCanvas.height = 128
-  const bhCtx = bhCanvas.getContext('2d')
-  const disk = bhCtx.createRadialGradient(64, 64, 16, 64, 64, 58)
-  disk.addColorStop(0, 'rgba(255,210,140,0.95)')
-  disk.addColorStop(0.3, 'rgba(255,150,60,0.6)')
-  disk.addColorStop(0.65, 'rgba(150,70,20,0.2)')
-  disk.addColorStop(1, 'rgba(0,0,0,0)')
-  bhCtx.fillStyle = disk; bhCtx.fillRect(0, 0, 128, 128)
-  bhCtx.globalCompositeOperation = 'destination-out'
-  const hole = bhCtx.createRadialGradient(64, 64, 0, 64, 64, 15)
-  hole.addColorStop(0, 'rgba(0,0,0,1)')
-  hole.addColorStop(1, 'rgba(0,0,0,0)')
-  bhCtx.fillStyle = hole; bhCtx.fillRect(0, 0, 128, 128)
-  const sgrSprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(bhCanvas), transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }))
-  sgrSprite.scale.set(70, 70, 1)
-  sgrSprite.position.set(gx, gy, gz)
-  scene.add(sgrSprite)
-
-  REAL_GALAXIES.forEach(g => {
-    const [x, y, z] = raDecToXYZ(g.ra, g.dec, DEEP_SPACE_RADIUS)
-    if (g.texture) {
-      loadFadedTexture(g.texture, (tex) => {
-        const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }))
-        sprite.scale.set(g.size, g.size * 0.5625, 1)
-        sprite.position.set(x, y, z)
-        scene.add(sprite)
-      })
-    } else {
-      const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: makeGalaxyTexture(g.shape, g.color), transparent: true, depthWrite: false }))
-      sprite.scale.set(g.size, g.size, 1)
-      sprite.position.set(x, y, z)
-      scene.add(sprite)
-    }
-  })
 }
+
+const SEARCH_ITEMS = [
+  { name: 'Sun', category: 'Star' },
+  ...BODIES.filter(b => b.name !== 'Sun').map(b => ({ name: b.name, category: 'Planet' })),
+  { name: 'Moon', category: 'Moon' },
+  ...GALILEAN.map(g => ({ name: g.name, category: 'Moon of Jupiter' })),
+  ...NAMED_STARS.map(s => ({ name: s[0], category: 'Star' })),
+]
+
 export default function App() {
   const mountRef = useRef(null)
   const controlsRef = useRef(null)
   const [selected, setSelected] = useState(null)
   const [isZoomed, setIsZoomed] = useState(false)
   const [page, setPage] = useState(null)
+  const flyToRef = useRef(null)
   const [showFavs, setShowFavs] = useState(false)
   const [ready, setReady] = useState(false)
   const [favorites, setFavorites] = useState(() => {
@@ -507,7 +586,7 @@ export default function App() {
     const controls = makeControls(camera, renderer.domElement)
     controlsRef.current = controls
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1.8))
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0))
     const sunLight = new THREE.PointLight(0xfff5e0, 3, 0)
     scene.add(sunLight)
 
@@ -535,11 +614,19 @@ export default function App() {
       clickTargets.push(mesh)
       if (b.glowColor) mesh.add(makeGlow(b.glowColor, b.size * 2 * (b.glowSize || 1.15)))
       if (b.hasRing) {
-        const rg = new THREE.RingGeometry(b.size * 1.32, b.size * 2.45, 128)
-        const rm = new THREE.MeshBasicMaterial({ color: 0xd4b896, side: THREE.DoubleSide, transparent: true, opacity: 0.75 })
-        loadTex('/2k_saturn_ring_alpha.png', (tex) => { if (tex) { rm.map = tex; rm.alphaMap = tex; rm.needsUpdate = true } })
+        const rg = new THREE.RingGeometry(b.size * 1.2, b.size * 2.35, 256)
+        const rm = new THREE.MeshBasicMaterial({
+          color: 0xffffff,
+          side: THREE.DoubleSide,
+          transparent: true,
+          opacity: 1,
+          depthWrite: false,
+        })
+        loadTex('/saturn_ring.png', (tex) => {
+          if (tex) { rm.map = tex; rm.needsUpdate = true }
+        })
         const ring = new THREE.Mesh(rg, rm)
-        ring.rotation.x = Math.PI / 2.3
+        ring.rotation.x = Math.PI / 2.15
         mesh.add(ring)
       }
       if (b.distance > 0) {
@@ -558,7 +645,14 @@ export default function App() {
     let moonAngle = 0
 
     const galMeshes = GALILEAN.map((g, gi) => {
-      const m = new THREE.Mesh(new THREE.SphereGeometry(g.size, 24, 24), new THREE.MeshStandardMaterial({ color: g.color, roughness: 0.9 }))
+      const mat = new THREE.MeshStandardMaterial({ color: g.color, roughness: 0.9 })
+      loadTex(g.texture, (tex) => {
+        if (!tex) return
+        mat.map = tex
+        mat.color.setHex(0xffffff)
+        mat.needsUpdate = true
+      })
+      const m = new THREE.Mesh(new THREE.SphereGeometry(g.size, 24, 24), mat)
       m.userData = { galIndex: gi }
       scene.add(m)
       clickTargets.push(m)
@@ -574,10 +668,20 @@ export default function App() {
     let bscStars = []
     loadBrightStarCatalog().then(stars => {
       const bscTex = makeStarTexture()
-      bscStars = stars.map(s => {
-        const [x, y, z] = raDecToXYZ(s.ra, s.dec, 2300)
-        return { ...s, position: new THREE.Vector3(x, y, z) }
-      })
+      bscStars = stars
+        .filter(s => {
+          return !NAMED_STARS.some(([, nra, ndec]) => {
+            let dra = Math.abs(s.ra - nra)
+            if (dra > 12) dra = 24 - dra
+            dra *= 15
+            const ddec = Math.abs(s.dec - ndec)
+            return Math.sqrt(dra * dra + ddec * ddec) < 0.2
+          })
+        })
+        .map(s => {
+          const [x, y, z] = raDecToXYZ(s.ra, s.dec, 2300)
+          return { ...s, position: new THREE.Vector3(x, y, z) }
+        })
       const positions = new Float32Array(bscStars.length * 3)
       const colors = new Float32Array(bscStars.length * 3)
       bscStars.forEach((s, i) => {
@@ -588,6 +692,7 @@ export default function App() {
       const bg = new THREE.BufferGeometry()
       bg.setAttribute('position', new THREE.BufferAttribute(positions, 3))
       bg.setAttribute('color', new THREE.BufferAttribute(colors, 3))
+      // FIXED: use bg (catalog geometry) with its own material, not ng
       scene.add(new THREE.Points(bg, new THREE.PointsMaterial({
         size: 1.5, map: bscTex, vertexColors: true, sizeAttenuation: true, transparent: true, alphaTest: 0.01, opacity: 0.95,
       })))
@@ -620,7 +725,7 @@ export default function App() {
         return
       }
 
-      let bestDist = 45, bestKind = null, bestIdx = -1
+      let bestDist = 25, bestKind = null, bestIdx = -1
       namedStarPositions.forEach((pos, si) => {
         const p = pos.clone().project(camera)
         if (p.z > 1) return
@@ -629,23 +734,44 @@ export default function App() {
         const d = Math.hypot(sx - e.clientX, sy - e.clientY)
         if (d < bestDist) { bestDist = d; bestKind = 'named'; bestIdx = si }
       })
-      bscStars.forEach((s, si) => {
-        const p = s.position.clone().project(camera)
-        if (p.z > 1) return
-        const sx = (p.x * 0.5 + 0.5) * window.innerWidth
-        const sy = (-p.y * 0.5 + 0.5) * window.innerHeight
-        const d = Math.hypot(sx - e.clientX, sy - e.clientY)
-        if (d < bestDist) { bestDist = d; bestKind = 'bsc'; bestIdx = si }
-      })
+      if (!bestKind) {
+        bestDist = 20
+        bscStars.forEach((s, si) => {
+          const p = s.position.clone().project(camera)
+          if (p.z > 1) return
+          const sx = (p.x * 0.5 + 0.5) * window.innerWidth
+          const sy = (-p.y * 0.5 + 0.5) * window.innerHeight
+          const d = Math.hypot(sx - e.clientX, sy - e.clientY)
+          if (d < bestDist) { bestDist = d; bestKind = 'bsc'; bestIdx = si }
+        })
+      }
 
-      if (bestKind === 'named') {
+            if (bestKind === 'named') {
         const [name, , , mag, con] = NAMED_STARS[bestIdx]
         setSelected({ name, info: name + ' is a real star, shown at its true position in the sky as seen from Earth.', stats: { Type: 'Star', 'Apparent Mag': mag, Constellation: con } })
-        controls.animateTo(namedStarPositions[bestIdx].clone(), 30); setIsZoomed(true)
+        controls.animateTo(namedStarPositions[bestIdx].clone(), { distance: 45, fov: 20, duration: 1400 })
+        setIsZoomed(true)
         return
       }
+
       if (bestKind === 'bsc') {
         const s = bscStars[bestIdx]
+        const match = NAMED_STARS.find(([, nra, ndec]) => {
+          let dra = Math.abs(s.ra - nra)
+          if (dra > 12) dra = 24 - dra
+          dra *= 15
+          const ddec = Math.abs(s.dec - ndec)
+          return Math.sqrt(dra * dra + ddec * ddec) < 0.2
+        })
+
+        if (match) {
+          const [name, , , mag, con] = match
+          setSelected({ name, info: `${name} is a real star, shown at its true position in the sky as seen from Earth.`, stats: { Type: 'Star', 'Apparent Mag': mag, Constellation: con } })
+          controls.animateTo(s.position.clone(), { distance: 45, fov: 20, duration: 1400 })
+          setIsZoomed(true)
+          return
+        }
+
         const cls = (s.spectral || '').trim().charAt(0).toUpperCase()
         const desc = {
           O: 'a blue, extremely hot and massive star',
@@ -657,23 +783,27 @@ export default function App() {
           M: 'a red star, the coolest and most common type',
         }[cls] || 'a star with an unusual or uncatalogued spectral type'
         setSelected({ name: 'HR ' + s.hr, info: `HR ${s.hr} is ${desc}, shown at its true position in the sky as seen from Earth.`, stats: { Type: 'Star', 'Apparent Mag': s.mag.toFixed(2), Spectral: s.spectral || 'Unknown' } })
-        controls.animateTo(s.position.clone(), 30); setIsZoomed(true)
+        controls.animateTo(s.position.clone(), { distance: 45, fov: 20, duration: 1400 })
+        setIsZoomed(true)
         return
       }
+
       setSelected(null); controls.reset(); setIsZoomed(false)
     }
 
     renderer.domElement.addEventListener('pointerdown', onPD)
     renderer.domElement.addEventListener('pointerup', onPU)
 
-    let animId
+
+        let animId
     function animate() {
       animId = requestAnimationFrame(animate)
+      controls.tick()
       BODIES.forEach((b, i) => {
         if (b.distance > 0) { angles[i] += b.speed; meshes[i].position.x = Math.cos(angles[i]) * b.distance; meshes[i].position.z = Math.sin(angles[i]) * b.distance }
         meshes[i].rotation.y += b.emissive ? 0.0008 : 0.003
       })
-      moonAngle += 0.006
+      moonAngle += 0.0005
       moonMesh.position.set(meshes[3].position.x + Math.cos(moonAngle) * 8, meshes[3].position.y, meshes[3].position.z + Math.sin(moonAngle) * 8)
       moonMesh.rotation.y += 0.002
       GALILEAN.forEach((g, i) => {
@@ -684,6 +814,42 @@ export default function App() {
     }
     animate()
     setTimeout(() => setReady(true), 400)
+
+    function onResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight) }
+    window.addEventListener('resize', onResize)
+
+        flyToRef.current = (name) => {
+      const bi = BODIES.findIndex(b => b.name === name)
+      if (bi >= 0) {
+        const b = BODIES[bi]
+        setSelected(b)
+        controls.animateTo(meshes[bi].position.clone(), b.size * 6 + 18)
+        setIsZoomed(true)
+        return
+      }
+      if (name === 'Moon') {
+        setSelected(MOON_INFO)
+        controls.animateTo(moonMesh.position.clone(), 14)
+        setIsZoomed(true)
+        return
+      }
+      const gi = GALILEAN.findIndex(g => g.name === name)
+      if (gi >= 0) {
+        const g = GALILEAN[gi]
+        setSelected({ name: g.name, info: g.name + ' is one of Jupiter four Galilean moons discovered by Galileo in 1610.', stats: { Type: 'Moon of Jupiter' } })
+        controls.animateTo(galMeshes[gi].position.clone(), g.size * 8)
+        setIsZoomed(true)
+        return
+      }
+            const si = NAMED_STARS.findIndex(s => s[0] === name)
+      if (si >= 0) {
+        const [n, , , mag, con] = NAMED_STARS[si]
+        setSelected({ name: n, info: n + ' is a real star, shown at its true position in the sky as seen from Earth.', stats: { Type: 'Star', 'Apparent Mag': mag, Constellation: con } })
+        controls.animateTo(namedStarPositions[si].clone(), { distance: 45, fov: 20, duration: 1400 })
+        setIsZoomed(true)
+        return
+      }
+    }
 
     function onResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight) }
     window.addEventListener('resize', onResize)
@@ -706,17 +872,39 @@ export default function App() {
       <div ref={mountRef} style={{ width:'100%', height:'100%', position:'absolute', inset:0 }} />
       <div style={{ position:'absolute', inset:0, background:'#02030f', transition:'opacity 1.4s ease', opacity: ready ? 0 : 1, pointerEvents:'none', zIndex:50 }} />
 
+            <div style={{
+        position: 'fixed',
+        top: 56,
+        left: 0,
+        right: 0,
+        zIndex: 200,
+        background: 'linear-gradient(90deg, rgba(18, 0, 117, 0.95), rgba(3, 20, 116, 0.95))',
+        color: '#f5f2f0',
+        fontFamily: 'system-ui, sans-serif',
+        fontSize: 12,
+        fontWeight: 600,
+        letterSpacing: '0.08em',
+        textAlign: 'center',
+        padding: '6px 16px',
+        pointerEvents: 'none',
+        textShadow: '0 1px 0 rgba(255,255,255,0.25)',
+      }}>
+        THIS WEBSITE IS UNDER DEVELOPMENT
+      </div>
+
       {!page && (
       <header style={{ position:'absolute', top:0, left:0, right:0, zIndex:20, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', rowGap:'8px', padding:'12px clamp(10px,4vw,28px)', background:'linear-gradient(to bottom, rgba(2,3,15,0.96) 55%, transparent)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
           <span style={{ fontSize:'1.15rem' }}>☄️</span>
           <span style={{ color:'#fff', fontSize:'1.15rem', fontWeight:300, letterSpacing:'0.28em', fontFamily:'Georgia, serif' }}>ASTROTRIP</span>
         </div>
+        <SearchBar items={SEARCH_ITEMS} onSelect={(it) => flyToRef.current?.(it.name)} />
         <nav style={{ display:'flex', gap:'4px', alignItems:'center', flexWrap:'wrap' }}>
-          <button style={nb()} onClick={() => { setPage(null); closePanel() }}>Explorer</button>
-          <button style={nb(page === 'article')}  onClick={() => { setPage('article');  setSelected(null) }}>Articles</button>
-          <button style={nb(page === 'game')} onClick={() => { setPage('game'); setSelected(null) }}>Game</button>
-          <button style={nb(page === 'tonight')} onClick={() => { setPage('tonight'); setSelected(null) }}>Tonight</button>
+          <button style={nb()} onClick={() => { setPage(null); closePanel() }}>AstroExplore</button>
+          <button style={nb(page === 'AstroLibrary')}  onClick={() => { setPage('AstroLibrary');  setSelected(null) }}>AstroLibrary</button>
+          <button style={nb(page === 'AstroGames')} onClick={() => { setPage('AstroGames'); setSelected(null) }}>AstroGames</button>
+          <button style={nb(page === 'AstroReport')} onClick={() => { setPage('AstroReport'); setSelected(null) }}>AstroReport</button>
+          <button style={nb(page === 'AstroGaze')} onClick={() => { setPage('AstroGaze'); setSelected(null) }}>AstroGaze</button>
           <button style={{ ...nb(showFavs), fontSize:'1rem', padding:'clamp(5px,1.5vw,7px) clamp(8px,2.5vw,12px)', display:'flex', alignItems:'center', gap:'5px' }} onClick={() => setShowFavs(v => !v)}>
             ★{favorites.length > 0 && <span style={{ background:'#5577ff', color:'#fff', borderRadius:'10px', fontSize:'0.68rem', padding:'1px 5px', fontWeight:600 }}>{favorites.length}</span>}
           </button>
@@ -724,15 +912,15 @@ export default function App() {
       </header>
       )}
 
-      {page === 'article' && (
+      {page === 'AstroLibrary' && (
         <div style={{ position:'absolute', inset:0, zIndex:15, background:'rgba(2,3,15,0.82)', backdropFilter:'blur(2px)' }}>
           <div style={{ width:'100%', height:'100%' }} className="page-scrollable">
-            <PostsPage type={page} onBack={() => setPage(null)} />
+            <PostsPage type="article" onBack={() => setPage(null)} />
           </div>
         </div>
       )}
 
-      {page === 'game' && (
+      {page === 'AstroGames' && (
         <div style={{ position:'absolute', inset:0, zIndex:15, background:'rgba(2,3,15,0.82)', backdropFilter:'blur(2px)' }}>
           <div style={{ width:'100%', height:'100%' }} className="page-scrollable">
             <GamesMenu onBack={() => setPage(null)} />
@@ -740,13 +928,15 @@ export default function App() {
         </div>
       )}
 
-      {page === 'tonight' && (
+      {page === 'AstroReport' && (
         <div style={{ position:'absolute', inset:0, zIndex:15, background:'rgba(2,3,15,0.82)', backdropFilter:'blur(2px)' }}>
           <div style={{ width:'100%', height:'100%' }} className="page-scrollable">
             <TonightSky onBack={() => setPage(null)} />
           </div>
         </div>
       )}
+
+      {page === 'AstroGaze' && <SkyView onBack={() => setPage(null)} />}
 
       {!selected && !page && (
         <div style={{ position:'absolute', bottom:'22px', left:'50%', transform:'translateX(-50%)', color:'rgba(160,190,255,0.35)', fontSize:'0.76rem', display:'flex', gap:'10px', zIndex:10, whiteSpace:'nowrap' }}>
@@ -785,12 +975,6 @@ export default function App() {
               <div key={f} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'6px 0', borderBottom:'1px solid rgba(100,140,255,0.08)' }}>
                 <span style={{ color:'rgba(195,215,255,0.8)', fontSize:'0.83rem' }}>{f}</span>
                 <button onClick={() => toggleFav(f)} style={{ background:'transparent', border:'none', color:'rgba(140,170,255,0.35)', cursor:'pointer', fontSize:'0.78rem', padding:'2px 6px' }}>✕</button>
-                <button
-  onClick={() => setPanMode(p => !p)}
-  style={{ position:'absolute', bottom:'20px', right:'20px', zIndex:20, background:'rgba(4,6,26,0.85)', border:'1px solid rgba(100,140,255,0.3)', color:'#c8d8ff', borderRadius:'8px', padding:'8px 12px', fontSize:'0.78rem', cursor:'pointer' }}
->
-  {panMode ? '✥ Pan' : '⤢ Zoom'}
-</button>
               </div>
             ))}
         </div>
