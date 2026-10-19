@@ -892,7 +892,7 @@ export default function App() {
         THIS WEBSITE IS UNDER DEVELOPMENT
       </div>
 
-    
+  
       
       {!page && (
       <header style={{ position:'absolute', top:0, left:0, right:0, zIndex:20, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', rowGap:'8px', padding:'12px clamp(10px,4vw,28px)', background:'linear-gradient(to bottom, rgba(2,3,15,0.96) 55%, transparent)' }}>

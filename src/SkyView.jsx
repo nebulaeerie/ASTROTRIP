@@ -229,6 +229,8 @@ export default function SkyView({ onBack }) {
     longitude: -118.2437,
   })
   const [obsTime, setObsTime] = useState(new Date())
+  const [selectedObject, setSelectedObject] = useState(null)
+  const catalogStarsRef = useRef([])
 
   useEffect(() => {
     const mount = mountRef.current
@@ -400,6 +402,7 @@ export default function SkyView({ onBack }) {
           return Math.sqrt(dra * dra + ddec * ddec) < 0.2
         })
       })
+    catalogStarsRef.current = filtered
       const N = filtered.length
       const catPos = new Float32Array(N * 3)
       const catSizes = new Float32Array(N)
@@ -575,12 +578,19 @@ export default function SkyView({ onBack }) {
     let dragging = false
     let lastX = 0, lastY = 0
 
+        let pointerDownX = 0
+    let pointerDownY = 0
+    let pointerDownTarget = null
+
     function onPointerDown(e) {
       dragging = true
       lastX = e.clientX
       lastY = e.clientY
       targetYaw = yaw
       targetPitch = pitch
+      pointerDownX = e.clientX
+      pointerDownY = e.clientY
+      pointerDownTarget = e.target
     }
     function onPointerMove(e) {
       if (!dragging) return
@@ -593,7 +603,102 @@ export default function SkyView({ onBack }) {
       lastX = e.clientX
       lastY = e.clientY
     }
-    function onPointerUp() { dragging = false }
+
+    function projectToScreen(raHours, decDeg) {
+      const [x, y, z] = raDecToXYZ(raHours, decDeg, 1)
+      const v = new THREE.Vector3(x, y, z).applyMatrix4(rotationRef.current).normalize()
+      const F = new THREE.Vector3(
+        Math.sin(yaw) * Math.cos(pitch),
+        Math.sin(pitch),
+        Math.cos(yaw) * Math.cos(pitch)
+      )
+      const R = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw))
+      const U = new THREE.Vector3(
+        -Math.sin(yaw) * Math.sin(pitch),
+        Math.cos(pitch),
+        -Math.cos(yaw) * Math.sin(pitch)
+      )
+      const vz = v.dot(F)
+      if (vz <= 0.001) return null
+      const vx = v.dot(R)
+      const vy = v.dot(U)
+      const theta = Math.acos(Math.max(-1, Math.min(1, vz)))
+      const aspect = window.innerWidth / window.innerHeight
+      const maxR = Math.sqrt(1 + aspect * aspect)
+      const rScreen = (theta / (fov * 0.5)) * maxR
+      const sinT = Math.sin(theta)
+      let pX = 0, pY = 0
+      if (sinT > 0.0001) {
+        pX = (vx / sinT) * rScreen
+        pY = (vy / sinT) * rScreen
+      }
+      return {
+        x: ((pX / aspect) + 1) * 0.5 * window.innerWidth,
+        y: (1 - (pY + 1) * 0.5) * window.innerHeight,
+      }
+    }
+
+    function findObjectAt(clickX, clickY) {
+      let best = null
+      let bestScore = Infinity
+      const aspect = window.innerWidth / window.innerHeight
+      const maxR = Math.sqrt(1 + aspect * aspect)
+
+      function consider(ra, dec, data, angularSize) {
+        const pos = projectToScreen(ra, dec)
+        if (!pos) return
+        const rawD = Math.hypot(pos.x - clickX, pos.y - clickY)
+        let score = rawD
+        let threshold = 25
+        if (angularSize) {
+          const pixelRadius = (angularSize / RAD_TO_ARCSEC) * maxR * window.innerHeight / fov / 2
+          if (pixelRadius * 2 < 3) return
+          score = Math.max(0, rawD - pixelRadius)
+          threshold = pixelRadius + 15
+        }
+        if (score < threshold && score < bestScore) {
+          bestScore = score
+          best = data
+        }
+      }
+
+      for (const [name, ra, dec, mag, con] of NAMED_STARS) {
+        consider(ra, dec, { name, kind: 'star', mag, constellation: con, ra, dec })
+      }
+      for (const s of catalogStarsRef.current) {
+        consider(s.ra, s.dec, {
+          name: 'HR ' + s.hr,
+          kind: 'star',
+          mag: s.mag,
+          constellation: null,
+          ra: s.ra,
+          dec: s.dec,
+        })
+      }
+      for (const b of solarBodiesRef.current) {
+        consider(
+          b.ra, b.dec,
+          { name: b.name, kind: b.kind, mag: b.magnitude, constellation: null, ra: b.ra, dec: b.dec },
+          b.angularSize
+        )
+      }
+
+      return best
+    }
+
+    function onPointerUp(e) {
+      dragging = false
+      if (!pointerDownTarget) return
+      const wasOnCanvas = pointerDownTarget === renderer.domElement
+      const moved = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY)
+      pointerDownTarget = null
+      if (!wasOnCanvas) return
+      if (moved > 10) return
+
+      const obj = findObjectAt(e.clientX, e.clientY)
+      setSelectedObject(obj || null)
+      highlightedStarRef.current = null
+    }
     function onWheel(e) {
       e.preventDefault()
       const factor = Math.exp(e.deltaY * 0.0012)
@@ -775,6 +880,62 @@ export default function SkyView({ onBack }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 30, background: '#02030f' }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
       <StarLabel starRef={highlightedStarRef} camStateRef={camStateRef} rotationRef={rotationRef} />
+            {selectedObject && (
+        <div style={{
+          position: 'absolute',
+          bottom: 60,
+          left: '50%',
+          transform: 'translateX(-50%)',
+          background: 'rgba(4,6,26,0.92)',
+          border: '1px solid rgba(100,140,255,0.3)',
+          borderRadius: 12,
+          padding: '14px 40px 14px 20px',
+          backdropFilter: 'blur(20px)',
+          zIndex: 45,
+          minWidth: 220,
+          maxWidth: 320,
+          boxShadow: '0 8px 32px rgba(0,0,0,0.5)',
+        }}>
+          <button
+            onClick={() => setSelectedObject(null)}
+            style={{
+              position: 'absolute', top: 8, right: 8,
+              background: 'transparent', border: 'none',
+              color: 'rgba(180,200,255,0.5)', fontSize: 18,
+              cursor: 'pointer', padding: '2px 8px',
+              fontFamily: 'inherit',
+            }}
+          >×</button>
+          <div style={{
+            color: '#e5e9f5',
+            fontSize: 16,
+            fontWeight: 600,
+            letterSpacing: '0.02em',
+          }}>
+            {selectedObject.name}
+          </div>
+          <div style={{
+            color: 'rgba(180,200,240,0.75)',
+            fontSize: 12,
+            marginTop: 6,
+            letterSpacing: '0.04em',
+          }}>
+            {(() => {
+              const parts = [
+                (selectedObject.kind || 'object')[0].toUpperCase() +
+                (selectedObject.kind || 'object').slice(1)
+              ]
+              if (selectedObject.mag !== null && selectedObject.mag !== undefined) {
+                parts.push('Mag ' + (typeof selectedObject.mag === 'number'
+                  ? selectedObject.mag.toFixed(2)
+                  : selectedObject.mag))
+              }
+              if (selectedObject.constellation) parts.push(selectedObject.constellation)
+              return parts.join(' · ')
+            })()}
+          </div>
+        </div>
+      )}
 
       <button
         onClick={onBack}
@@ -795,6 +956,7 @@ export default function SkyView({ onBack }) {
           items={GAZE_SEARCH_ITEMS}
           placeholder="Search…"
           onSelect={(it) => {
+         setSelectedObject(null)
             const star = NAMED_STARS.find(x => x[0] === it.name)
             if (star && pointAtRef.current) {
               pointAtRef.current(star[1], star[2])
