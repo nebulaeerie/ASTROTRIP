@@ -893,7 +893,7 @@ export default function App() {
       </div>
 
       {!page && (
-      <header style={{ position:'absolute', top:0, left:0, right:0, zIndex:20, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', rowGap:'8px', padding:'12px clamp(10px,4vw,28px)', background:'linear-gradient(to bottom, rgba(2,3,15,0.96) 55%, transparent)' }}>
+      <header style={{ position:'absolute', top:32, left:0, right:0, zIndex:20, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', rowGap:'8px', padding:'12px clamp(10px,4vw,28px)', background:'linear-gradient(to bottom, rgba(2,3,15,0.96) 55%, transparent)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
           <span style={{ fontSize:'1.15rem' }}>☄️</span>
           <span style={{ color:'#fff', fontSize:'1.15rem', fontWeight:300, letterSpacing:'0.28em', fontFamily:'Georgia, serif' }}>ASTROTRIP</span>
