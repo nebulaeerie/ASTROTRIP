@@ -100,3 +100,23 @@ html, body {
   text-align: center;
   margin-top: 8px;
 }
+
+
+/* Mobile-only: keep nav in one row, scroll horizontally, no wrapping */
+@media (max-width: 768px) {
+  .main-nav {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .main-nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .app-header {
+    top: 32px !important;
+  }
+}
