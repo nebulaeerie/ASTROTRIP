@@ -120,3 +120,26 @@ html, body {
     top: 32px !important;
   }
 }
+
+@media (max-width: 768px) {
+  .dev-banner {
+    top: auto !important;
+    bottom: 0 !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .main-nav {
+    flex-wrap: nowrap !important;
+    overflow-x: auto;
+    overflow-y: hidden;
+    max-width: 100%;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 28px), transparent 100%);
+  }
+  .main-nav::-webkit-scrollbar {
+    display: none;
+  }
+}

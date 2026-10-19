@@ -872,14 +872,15 @@ export default function App() {
       <div ref={mountRef} style={{ width:'100%', height:'100%', position:'absolute', inset:0 }} />
       <div style={{ position:'absolute', inset:0, background:'#02030f', transition:'opacity 1.4s ease', opacity: ready ? 0 : 1, pointerEvents:'none', zIndex:50 }} />
 
-            <div style={{
+
+      <div className="dev-banner" style={{
         position: 'fixed',
-        top: 56,
+        top: 0,
         left: 0,
         right: 0,
         zIndex: 200,
-        background: 'linear-gradient(90deg, rgba(18, 0, 117, 0.95), rgba(3, 20, 116, 0.95))',
-        color: '#f5f2f0',
+        background: 'linear-gradient(90deg, rgba(255,180,60,0.95), rgba(255,140,30,0.95))',
+        color: '#1a1005',
         fontFamily: 'system-ui, sans-serif',
         fontSize: 12,
         fontWeight: 600,
@@ -889,7 +890,7 @@ export default function App() {
         pointerEvents: 'none',
         textShadow: '0 1px 0 rgba(255,255,255,0.25)',
       }}>
-        THIS WEBSITE IS UNDER DEVELOPMENT
+       THIS WEBSITE IS UNDER DEVELOPMENT
       </div>
 
       {!page && (
