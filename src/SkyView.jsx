@@ -4,6 +4,7 @@ import { loadBrightStarCatalog } from './starData'
 import SearchBar from './SearchBar'
 import { CITIES } from './cities'
 import * as Astronomy from 'astronomy-engine'
+import * as satellite from 'satellite.js'
 
 const AU_KM = 149597870.7
 const RAD_TO_ARCSEC = 206264.806
@@ -18,6 +19,168 @@ const SS_BODIES = [
   { body: Astronomy.Body.Saturn,  name: 'Saturn',  kind: 'planet', radius_km: 58232,  tex: '/2k_saturn.jpg' },
   { body: Astronomy.Body.Uranus,  name: 'Uranus',  kind: 'planet', radius_km: 25362,  tex: '/2k_uranus_new.jpg' },
   { body: Astronomy.Body.Neptune, name: 'Neptune', kind: 'planet', radius_km: 24622,  tex: '/2k_neptune.jpg' },
+]
+
+const LIVE_SATELLITES = [
+  { name: 'ISS (ZARYA)', norad: 25544 },
+  { name: 'Hubble Space Telescope', norad: 20580 },
+  { name: 'Tiangong', norad: 48274 },
+]
+
+function makeSatelliteTexture() {
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  const ctx = c.getContext('2d')
+  const halo = ctx.createRadialGradient(64, 64, 20, 64, 64, 62)
+  halo.addColorStop(0, 'rgba(100,220,255,0.55)')
+  halo.addColorStop(0.6, 'rgba(100,220,255,0.2)')
+  halo.addColorStop(1, 'rgba(100,220,255,0)')
+  ctx.fillStyle = halo
+  ctx.fillRect(0, 0, 128, 128)
+  ctx.fillStyle = '#3d6fc4'
+  ctx.fillRect(6, 50, 44, 28)
+  ctx.fillRect(78, 50, 44, 28)
+  ctx.strokeStyle = 'rgba(160,210,255,0.75)'
+  ctx.lineWidth = 1
+  for (let i = 1; i < 4; i++) {
+    ctx.beginPath()
+    ctx.moveTo(6 + i * 11, 50)
+    ctx.lineTo(6 + i * 11, 78)
+    ctx.stroke()
+    ctx.beginPath()
+    ctx.moveTo(78 + i * 11, 50)
+    ctx.lineTo(78 + i * 11, 78)
+    ctx.stroke()
+  }
+  ctx.strokeRect(6.5, 50.5, 43, 27)
+  ctx.strokeRect(78.5, 50.5, 43, 27)
+  ctx.fillStyle = '#eef4ff'
+  ctx.fillRect(52, 36, 24, 56)
+  ctx.fillStyle = 'rgba(140,180,230,0.85)'
+  ctx.fillRect(56, 42, 16, 5)
+  ctx.fillRect(56, 52, 16, 5)
+  ctx.fillRect(56, 62, 16, 5)
+  ctx.fillRect(56, 72, 16, 5)
+  ctx.fillStyle = '#a0c8f0'
+  ctx.fillRect(50, 62, 4, 4)
+  ctx.fillRect(74, 62, 4, 4)
+  ctx.strokeStyle = '#eef4ff'
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.moveTo(64, 36)
+  ctx.lineTo(64, 18)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(64, 16, 3.5, 0, Math.PI * 2)
+  ctx.fillStyle = '#ffffff'
+  ctx.fill()
+  ctx.strokeStyle = 'rgba(255,255,255,0.55)'
+  ctx.lineWidth = 1
+  ctx.beginPath()
+  ctx.moveTo(6, 50)
+  ctx.lineTo(50, 50)
+  ctx.moveTo(78, 50)
+  ctx.lineTo(122, 50)
+  ctx.stroke()
+  const tex = new THREE.CanvasTexture(c)
+  tex.minFilter = THREE.LinearFilter
+  tex.magFilter = THREE.LinearFilter
+  return tex
+}
+
+async function fetchSatTLE(norad) {
+  const base = window.location.hostname === 'localhost'
+    ? 'https://astro-trip-blond.vercel.app'
+    : ''
+  const r = await fetch(`${base}/api/tle?norad=${norad}`)
+  if (!r.ok) throw new Error(`TLE ${r.status}`)
+  const text = await r.text()
+  const lines = text.split('\n').map(l => l.trim()).filter(Boolean)
+  if (lines.length < 3) throw new Error('TLE bad format')
+  return { line1: lines[1], line2: lines[2] }
+}
+
+async function loadLiveSatellites(lat, lon) {
+  const now = new Date()
+  const out = []
+  for (const sat of LIVE_SATELLITES) {
+    try {
+      const tle = await fetchSatTLE(sat.norad)
+      const satrec = satellite.twoline2satrec(tle.line1, tle.line2)
+      const posVel = satellite.propagate(satrec, now)
+      if (!posVel || !posVel.position) continue
+      const gmst = satellite.gstime(now)
+      const satEcf = satellite.eciToEcf(posVel.position, gmst)
+      const observerGd = {
+        latitude: (lat * Math.PI) / 180,
+        longitude: (lon * Math.PI) / 180,
+        height: 0.05,
+      }
+      const look = satellite.ecfToLookAngles(observerGd, satEcf)
+      const altDeg = (look.elevation * 180) / Math.PI
+      const obsEcf = satellite.geodeticToEcf(observerGd)
+      const obsEci = satellite.ecfToEci(obsEcf, gmst)
+      const dx = posVel.position.x - obsEci.x
+      const dy = posVel.position.y - obsEci.y
+      const dz = posVel.position.z - obsEci.z
+      const range = Math.sqrt(dx * dx + dy * dy + dz * dz)
+      const raRad = Math.atan2(dy, dx)
+      const decRad = Math.asin(dz / range)
+      out.push({
+        name: sat.name,
+        norad: sat.norad,
+        kind: 'satellite',
+        ra: ((raRad * 12) / Math.PI + 24) % 24,
+        dec: (decRad * 180) / Math.PI,
+        altitudeDeg: altDeg,
+        rangeKm: range,
+      })
+    } catch (err) {
+      console.warn('Satellite load failed:', sat.name, err)
+    }
+  }
+  return out
+}
+
+const EXOPLANET_SYSTEMS = [
+  { name: 'Proxima Centauri', ra: 14.495, dec: -62.679, dist: 4.24, mag: 11.13, spec: 'M5.5V',
+    planets: [{ id: 'b', note: 'habitable zone' }, { id: 'd', note: 'candidate' }] },
+  { name: 'TRAPPIST-1', ra: 23.108, dec: -5.041, dist: 40.7, mag: 18.8, spec: 'M8V',
+    planets: [{ id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e', note: 'habitable zone' }, { id: 'f' }, { id: 'g' }, { id: 'h' }] },
+  { name: '51 Pegasi', ra: 22.958, dec: 20.769, dist: 50.9, mag: 5.49, spec: 'G2.5IV',
+    planets: [{ id: 'b', note: 'first exoplanet around a Sun-like star (1995)' }] },
+  { name: 'Tau Ceti', ra: 1.734, dec: -15.938, dist: 11.9, mag: 3.50, spec: 'G8V',
+    planets: [{ id: 'e' }, { id: 'f' }, { id: 'g' }, { id: 'h' }] },
+  { name: 'GJ 1214', ra: 17.255, dec: 4.964, dist: 48.0, mag: 14.7, spec: 'M4.5V',
+    planets: [{ id: 'b', note: 'water world candidate' }] },
+  { name: 'HD 189733', ra: 20.012, dec: 22.711, dist: 64.5, mag: 7.67, spec: 'K1V',
+    planets: [{ id: 'b', note: 'hot Jupiter, glass rain' }] },
+  { name: 'WASP-12', ra: 6.509, dec: 29.672, dist: 1400, mag: 11.7, spec: 'G0V',
+    planets: [{ id: 'b', note: 'being torn apart by its star' }] },
+  { name: '55 Cancri', ra: 8.877, dec: 28.331, dist: 41, mag: 5.95, spec: 'G8V',
+    planets: [{ id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e', note: 'lava world candidate' }, { id: 'f' }] },
+  { name: 'Kepler-452', ra: 19.734, dec: 44.277, dist: 1800, mag: 13.4, spec: 'G2V',
+    planets: [{ id: 'b', note: 'Earth cousin' }] },
+  { name: 'Kepler-22', ra: 19.281, dec: 47.885, dist: 640, mag: 11.8, spec: 'G5V',
+    planets: [{ id: 'b', note: 'first Kepler planet in habitable zone' }] },
+  { name: 'K2-18', ra: 11.504, dec: 7.588, dist: 124, mag: 13.5, spec: 'M2.5V',
+    planets: [{ id: 'b', note: 'water vapor detected' }] },
+  { name: 'TOI-700', ra: 6.457, dec: -65.579, dist: 101.4, mag: 13.2, spec: 'M2V',
+    planets: [{ id: 'b' }, { id: 'c' }, { id: 'd', note: 'habitable zone' }, { id: 'e' }] },
+  { name: 'LHS 1140', ra: 0.750, dec: -15.271, dist: 48.8, mag: 14.2, spec: 'M4.5V',
+    planets: [{ id: 'b', note: 'super-Earth, habitable zone' }] },
+  { name: 'GJ 667C', ra: 17.316, dec: -34.990, dist: 23.6, mag: 10.2, spec: 'M1.5V',
+    planets: [{ id: 'c', note: 'habitable zone candidate' }] },
+  { name: "Luyten's Star", ra: 7.468, dec: 5.225, dist: 12.4, mag: 9.87, spec: 'M3.5V',
+    planets: [{ id: 'b', note: 'super-Earth' }] },
+  { name: 'Ross 128', ra: 11.798, dec: 0.806, dist: 11.0, mag: 11.1, spec: 'M4V',
+    planets: [{ id: 'b', note: 'temperate, 11 light-years away' }] },
+  { name: 'YZ Ceti', ra: 1.398, dec: -16.998, dist: 12.1, mag: 12.0, spec: 'M4.5V',
+    planets: [{ id: 'b' }, { id: 'c' }, { id: 'd' }] },
+  { name: 'Gliese 581', ra: 15.326, dec: -7.722, dist: 20.4, mag: 10.6, spec: 'M3V',
+    planets: [{ id: 'b' }, { id: 'c' }, { id: 'd' }, { id: 'e', note: 'habitable zone candidate' }] },
+  { name: 'Elias 2-24', ra: 16.4400, dec: -24.2704, dist: 450, mag: 14.4, spec: 'K5.5',
+    planets: [{ id: 'b', note: 'youngest known planet, still forming' }] },
 ]
 
 function bodyColor(name) {
@@ -118,11 +281,16 @@ const NAMED_STARS = [
 ]
 
 const GAZE_SEARCH_ITEMS = [
+  ...LIVE_SATELLITES.map(s => ({ name: s.name, category: 'Satellite' })),
   ...NAMED_STARS.map(s => ({ name: s[0], category: 'Star' })),
   ...SS_BODIES.map(b => ({
     name: b.name,
     category: b.kind === 'planet' ? 'Planet' : b.kind === 'moon' ? 'Moon' : 'Sun',
   })),
+  ...EXOPLANET_SYSTEMS.map(sys => ({ name: sys.name, category: 'Exoplanet system' })),
+  ...EXOPLANET_SYSTEMS.flatMap(sys =>
+    sys.planets.map(p => ({ name: `${sys.name} ${p.id}`, category: 'Exoplanet' }))
+  ),
 ]
 
 function computeLST(date, lon_deg) {
@@ -163,7 +331,7 @@ function spectralToRGB(cls) {
 }
 
 function magToSize(mag) {
-  return 1.5 + Math.max(0, 3.0 - mag) * 1.4
+  return 2.4 + Math.max(0, 3.5 - mag) * 1.8
 }
 
 function raDecToXYZ(raHours, decDeg, radius) {
@@ -222,6 +390,10 @@ export default function SkyView({ onBack }) {
   const highlightStarRef = useRef(null)
   const highlightedStarRef = useRef(null)
   const camStateRef = useRef({ yaw: 0, pitch: 0, fov: Math.PI / 2, discLarge: false })
+  const catalogStarsRef = useRef([])
+  const satellitesRef = useRef([])
+  const refreshSatellitesRef = useRef(null)
+  const observerRef = useRef(null)
 
   const [observer, setObserver] = useState({
     name: 'Los Angeles',
@@ -230,7 +402,9 @@ export default function SkyView({ onBack }) {
   })
   const [obsTime, setObsTime] = useState(new Date())
   const [selectedObject, setSelectedObject] = useState(null)
-  const catalogStarsRef = useRef([])
+  const [satellites, setSatellites] = useState([])
+
+  observerRef.current = observer
 
   useEffect(() => {
     const mount = mountRef.current
@@ -322,7 +496,7 @@ export default function SkyView({ onBack }) {
       namedPos[i * 3] = x
       namedPos[i * 3 + 1] = y
       namedPos[i * 3 + 2] = z
-      namedSizes[i] = magToSize(mag) * 1.3
+      namedSizes[i] = magToSize(mag) * 1.5
       const [r, g, b] = spectralToRGB(spec)
       namedColors[i * 3] = r
       namedColors[i * 3 + 1] = g
@@ -359,6 +533,27 @@ export default function SkyView({ onBack }) {
       fGeo.setAttribute('aColor', new THREE.BufferAttribute(fColors, 3))
       starGroup.add(new THREE.Points(fGeo, starMat))
     }
+
+    const exoCount = EXOPLANET_SYSTEMS.length
+    const exoPos = new Float32Array(exoCount * 3)
+    const exoSizes = new Float32Array(exoCount)
+    const exoColors = new Float32Array(exoCount * 3)
+    EXOPLANET_SYSTEMS.forEach((sys, i) => {
+      const [x, y, z] = raDecToXYZ(sys.ra, sys.dec, 1)
+      exoPos[i * 3] = x
+      exoPos[i * 3 + 1] = y
+      exoPos[i * 3 + 2] = z
+      exoSizes[i] = 3.0
+      const [r, g, b] = spectralToRGB(sys.spec)
+      exoColors[i * 3] = r
+      exoColors[i * 3 + 1] = g
+      exoColors[i * 3 + 2] = b
+    })
+    const exoGeo = new THREE.BufferGeometry()
+    exoGeo.setAttribute('position', new THREE.BufferAttribute(exoPos, 3))
+    exoGeo.setAttribute('aSize', new THREE.BufferAttribute(exoSizes, 1))
+    exoGeo.setAttribute('aColor', new THREE.BufferAttribute(exoColors, 3))
+    starGroup.add(new THREE.Points(exoGeo, starMat))
 
     const renderer = new THREE.WebGLRenderer({ antialias: true })
     renderer.setSize(window.innerWidth, window.innerHeight)
@@ -402,7 +597,7 @@ export default function SkyView({ onBack }) {
           return Math.sqrt(dra * dra + ddec * ddec) < 0.2
         })
       })
-    catalogStarsRef.current = filtered
+      catalogStarsRef.current = filtered
       const N = filtered.length
       const catPos = new Float32Array(N * 3)
       const catSizes = new Float32Array(N)
@@ -426,7 +621,6 @@ export default function SkyView({ onBack }) {
       cubeCamera.update(renderer, scene)
     }).catch(err => console.error('Bright Star Catalog load failed:', err))
 
-    // Fisheye pass
     const fisheyeScene = new THREE.Scene()
     const fisheyeCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1)
 
@@ -478,7 +672,6 @@ export default function SkyView({ onBack }) {
 
     fisheyeScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), fisheyeMat))
 
-    // Solar system sphere pass
     const discScene = new THREE.Scene()
     const discCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, -1e5, 1e5)
     const aspect0 = window.innerWidth / window.innerHeight
@@ -550,7 +743,22 @@ export default function SkyView({ onBack }) {
       bodyMeshes[b.name] = { mesh, ringMesh, glowSprite, kind: b.kind, name: b.name }
     })
 
-    // Look + zoom state
+    const satGeo = new THREE.BufferGeometry()
+    const satPosArr = new Float32Array(LIVE_SATELLITES.length * 3)
+    satGeo.setAttribute('position', new THREE.BufferAttribute(satPosArr, 3))
+    satGeo.setDrawRange(0, 0)
+    const satMat = new THREE.PointsMaterial({
+      map: makeSatelliteTexture(),
+      size: 34,
+      sizeAttenuation: false,
+      transparent: true,
+      depthWrite: false,
+      alphaTest: 0.01,
+    })
+    const satPoints = new THREE.Points(satGeo, satMat)
+    satPoints.visible = false
+    discScene.add(satPoints)
+
     let yaw = 0
     let pitch = 0
     let targetYaw = 0
@@ -574,11 +782,9 @@ export default function SkyView({ onBack }) {
       }
     }
 
-    // Input
     let dragging = false
     let lastX = 0, lastY = 0
-
-        let pointerDownX = 0
+    let pointerDownX = 0
     let pointerDownY = 0
     let pointerDownTarget = null
 
@@ -678,11 +884,34 @@ export default function SkyView({ onBack }) {
       for (const b of solarBodiesRef.current) {
         consider(
           b.ra, b.dec,
-          { name: b.name, kind: b.kind, mag: b.magnitude, constellation: null, ra: b.ra, dec: b.dec },
+          { name: b.name, kind: b.kind, mag: b.magnitude, constellation: null, ra: b.ra, dec: b.dec, angularSize: b.angularSize },
           b.angularSize
         )
       }
-
+      for (const sys of EXOPLANET_SYSTEMS) {
+        consider(sys.ra, sys.dec, {
+          name: sys.name,
+          kind: 'exoplanet-host',
+          mag: sys.mag,
+          constellation: null,
+          ra: sys.ra,
+          dec: sys.dec,
+          planets: sys.planets,
+          dist: sys.dist,
+        })
+      }
+      for (const s of satellitesRef.current) {
+        consider(s.ra, s.dec, {
+          name: s.name,
+          kind: 'satellite',
+          mag: null,
+          constellation: null,
+          ra: s.ra,
+          dec: s.dec,
+          altitudeDeg: s.altitudeDeg,
+          rangeKm: s.rangeKm,
+        })
+      }
       return best
     }
 
@@ -699,9 +928,10 @@ export default function SkyView({ onBack }) {
       setSelectedObject(obj || null)
       highlightedStarRef.current = null
     }
+
     function onWheel(e) {
       e.preventDefault()
-      const factor = Math.exp(e.deltaY * 0.0012)
+      const factor = Math.exp(e.deltaY * 0.003)
       targetFov = Math.max(1e-6, Math.min(Math.PI, targetFov * factor))
     }
 
@@ -725,6 +955,17 @@ export default function SkyView({ onBack }) {
     const frameReadout = document.getElementById('astrogaze-frame')
 
     let animId
+
+    async function refreshSatellites() {
+      const obs = observerRef.current
+      const sats = await loadLiveSatellites(obs.latitude, obs.longitude)
+      setSatellites(sats)
+      satellitesRef.current = sats
+    }
+    refreshSatellites()
+    const satInterval = setInterval(refreshSatellites, 30000)
+    refreshSatellitesRef.current = refreshSatellites
+
     function animate() {
       animId = requestAnimationFrame(animate)
 
@@ -733,7 +974,7 @@ export default function SkyView({ onBack }) {
       if (dYaw < -Math.PI) dYaw += 2 * Math.PI
       yaw += dYaw * 0.12
       pitch += (targetPitch - pitch) * 0.12
-      fov += (targetFov - fov) * 0.18
+      fov += (targetFov - fov) * 0.28
 
       fisheyeMat.uniforms.uYaw.value = yaw
       fisheyeMat.uniforms.uPitch.value = pitch
@@ -753,6 +994,32 @@ export default function SkyView({ onBack }) {
         Math.cos(pitch),
         -Math.cos(yaw) * Math.sin(pitch)
       )
+
+      if (satellitesRef.current.length > 0) {
+        const posAttr = satPoints.geometry.attributes.position
+        let visibleIdx = 0
+        for (const s of satellitesRef.current) {
+          const [sx, sy, sz] = raDecToXYZ(s.ra, s.dec, 1)
+          const v = new THREE.Vector3(sx, sy, sz).applyMatrix4(rotationRef.current).normalize()
+          const vzS = v.dot(Fv)
+          if (vzS <= 0.001) continue
+          const vxS = v.dot(Rv)
+          const vyS = v.dot(Uv)
+          const thetaS = Math.acos(Math.max(-1, Math.min(1, vzS)))
+          const rS = (thetaS / (fov * 0.5)) * maxR
+          const sinTS = Math.sin(thetaS)
+          if (sinTS < 0.0001) continue
+          const px = (vxS / sinTS) * rS
+          const py = (vyS / sinTS) * rS
+          posAttr.setXYZ(visibleIdx, px, py, 0)
+          visibleIdx++
+        }
+        posAttr.needsUpdate = true
+        satPoints.geometry.setDrawRange(0, visibleIdx)
+        satPoints.visible = visibleIdx > 0
+      } else {
+        satPoints.visible = false
+      }
 
       let anyDiscLarge = false
       const THRESHOLD_SHOW = 12
@@ -844,6 +1111,7 @@ export default function SkyView({ onBack }) {
     animate()
 
     return () => {
+      clearInterval(satInterval)
       cancelAnimationFrame(animId)
       window.removeEventListener('pointerdown', onPointerDown)
       window.removeEventListener('pointermove', onPointerMove)
@@ -857,6 +1125,7 @@ export default function SkyView({ onBack }) {
       recaptureRef.current = null
       highlightStarRef.current = null
       highlightedStarRef.current = null
+      refreshSatellitesRef.current = null
     }
   }, [])
 
@@ -870,6 +1139,7 @@ export default function SkyView({ onBack }) {
     solarBodiesRef.current = getSolarSystemBodies(obsTime, observer.latitude, observer.longitude)
 
     if (recaptureRef.current) recaptureRef.current()
+    if (refreshSatellitesRef.current) refreshSatellitesRef.current()
   }, [observer, obsTime])
 
   const dtValue = new Date(obsTime.getTime() - obsTime.getTimezoneOffset() * 60000)
@@ -880,7 +1150,8 @@ export default function SkyView({ onBack }) {
     <div style={{ position: 'fixed', inset: 0, zIndex: 30, background: '#02030f' }}>
       <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
       <StarLabel starRef={highlightedStarRef} camStateRef={camStateRef} rotationRef={rotationRef} />
-            {selectedObject && (
+
+      {selectedObject && (
         <div style={{
           position: 'absolute',
           bottom: 60,
@@ -906,20 +1177,11 @@ export default function SkyView({ onBack }) {
               fontFamily: 'inherit',
             }}
           >×</button>
-          <div style={{
-            color: '#e5e9f5',
-            fontSize: 16,
-            fontWeight: 600,
-            letterSpacing: '0.02em',
-          }}>
+
+          <div style={{ color: '#e5e9f5', fontSize: 16, fontWeight: 600, letterSpacing: '0.02em' }}>
             {selectedObject.name}
           </div>
-          <div style={{
-            color: 'rgba(180,200,240,0.75)',
-            fontSize: 12,
-            marginTop: 6,
-            letterSpacing: '0.04em',
-          }}>
+          <div style={{ color: 'rgba(180,200,240,0.75)', fontSize: 12, marginTop: 6, letterSpacing: '0.04em' }}>
             {(() => {
               const parts = [
                 (selectedObject.kind || 'object')[0].toUpperCase() +
@@ -934,6 +1196,72 @@ export default function SkyView({ onBack }) {
               return parts.join(' · ')
             })()}
           </div>
+
+          {selectedObject.dist && (
+            <div style={{ color: 'rgba(180,200,240,0.6)', fontSize: 11, marginTop: 3 }}>
+              {selectedObject.dist} light-years away
+            </div>
+          )}
+
+          {selectedObject.rangeKm && (
+            <div style={{ color: 'rgba(180,200,240,0.6)', fontSize: 11, marginTop: 3 }}>
+              {selectedObject.rangeKm.toFixed(0)} km away ·{' '}
+              {selectedObject.altitudeDeg > 0
+                ? `${selectedObject.altitudeDeg.toFixed(0)}° above horizon`
+                : 'below horizon'}
+            </div>
+          )}
+
+          {selectedObject.planets && selectedObject.planets.length > 0 && (
+            <div style={{
+              marginTop: 10, paddingTop: 10,
+              borderTop: '1px solid rgba(100,140,255,0.15)',
+              display: 'flex', flexWrap: 'wrap', gap: 6,
+            }}>
+              {selectedObject.planets.map(p => (
+                <span key={p.id} style={{
+                  background: 'rgba(255,200,80,0.12)',
+                  border: '1px solid rgba(255,200,80,0.3)',
+                  color: '#ffd680', borderRadius: 6,
+                  padding: '3px 8px', fontSize: 11, fontWeight: 500,
+                }}>
+                  {p.id}{p.note ? ` · ${p.note}` : ''}
+                </span>
+              ))}
+            </div>
+          )}
+
+          {selectedObject.planet && (
+            <div style={{
+              marginTop: 10, paddingTop: 10,
+              borderTop: '1px solid rgba(100,140,255,0.15)',
+              color: 'rgba(255,215,140,0.9)', fontSize: 12,
+            }}>
+              Orbiting {selectedObject.system.name}
+              {selectedObject.planet.note ? ` — ${selectedObject.planet.note}` : ''}
+            </div>
+          )}
+
+          <button
+            onClick={() => {
+              const ra = selectedObject.ra ?? selectedObject.system?.ra
+              const dec = selectedObject.dec ?? selectedObject.system?.dec
+              if (ra !== undefined && dec !== undefined && pointAtRef.current) {
+                pointAtRef.current(ra, dec, selectedObject.angularSize)
+              }
+            }}
+            style={{
+              marginTop: 12,
+              background: 'rgba(255,190,70,0.15)',
+              border: '1px solid rgba(255,190,70,0.45)',
+              color: '#ffd680', borderRadius: 8,
+              padding: '8px 16px', fontSize: 12, fontWeight: 600,
+              letterSpacing: '0.06em', cursor: 'pointer',
+              fontFamily: 'inherit', width: '100%', minHeight: 40,
+            }}
+          >
+            FLY TO IT
+          </button>
         </div>
       )}
 
@@ -949,21 +1277,19 @@ export default function SkyView({ onBack }) {
       >← Back</button>
 
       <div style={{
-        position: 'absolute', top: 16, left: '50%', transform: 'translateX(-50%)',
+        position: 'absolute', top: 72, left: '50%', transform: 'translateX(-50%)',
         zIndex: 40, width: 240,
       }}>
         <SearchBar
           items={GAZE_SEARCH_ITEMS}
           placeholder="Search…"
           onSelect={(it) => {
-         setSelectedObject(null)
+            setSelectedObject(null)
             const star = NAMED_STARS.find(x => x[0] === it.name)
             if (star && pointAtRef.current) {
               pointAtRef.current(star[1], star[2])
               highlightStarRef.current?.(star[1], star[2], star[0], {
-                kind: 'star',
-                mag: star[3],
-                constellation: star[4],
+                kind: 'star', mag: star[3], constellation: star[4],
               })
               return
             }
@@ -971,17 +1297,48 @@ export default function SkyView({ onBack }) {
             if (body && pointAtRef.current) {
               pointAtRef.current(body.ra, body.dec, body.angularSize)
               highlightStarRef.current?.(body.ra, body.dec, body.name, {
-                kind: body.kind,
-                mag: body.magnitude,
-                constellation: null,
+                kind: body.kind, mag: body.magnitude, constellation: null,
               })
+              return
+            }
+            for (const sys of EXOPLANET_SYSTEMS) {
+              const sysMatch = it.name === sys.name
+              const planetMatch = it.name.startsWith(sys.name + ' ')
+              if ((sysMatch || planetMatch) && pointAtRef.current) {
+                pointAtRef.current(sys.ra, sys.dec)
+                highlightStarRef.current?.(sys.ra, sys.dec, sys.name, {
+                  kind: 'star', mag: sys.mag, constellation: null,
+                })
+                setSelectedObject(
+                  planetMatch
+                    ? {
+                        name: it.name, kind: 'exoplanet', system: sys,
+                        planet: sys.planets.find(p => it.name === `${sys.name} ${p.id}`),
+                        ra: sys.ra, dec: sys.dec,
+                      }
+                    : {
+                        name: sys.name, kind: 'exoplanet-host', system: sys,
+                        mag: sys.mag, planets: sys.planets, dist: sys.dist,
+                        ra: sys.ra, dec: sys.dec,
+                      }
+                )
+                return
+              }
+            }
+            const sat = satellitesRef.current.find(s => s.name === it.name)
+            if (sat && pointAtRef.current) {
+              pointAtRef.current(sat.ra, sat.dec)
+              highlightStarRef.current?.(sat.ra, sat.dec, sat.name, {
+                kind: 'star', mag: null, constellation: null,
+              })
+              setSelectedObject(sat)
             }
           }}
         />
       </div>
 
       <div style={{
-        position: 'absolute', top: 20, right: 20, zIndex: 40,
+        position: 'absolute', top: 72, right: 20, zIndex: 40,
         color: '#c8d8ff', fontFamily: 'ui-monospace, monospace',
         fontSize: 13, letterSpacing: '0.05em', textAlign: 'right',
         pointerEvents: 'none', textShadow: '0 0 12px rgba(100,150,255,0.6)',
@@ -992,7 +1349,7 @@ export default function SkyView({ onBack }) {
       </div>
 
       <div style={{
-        position: 'absolute', bottom: 20, left: 20, zIndex: 40,
+        position: 'absolute', bottom: 44, left: 20, zIndex: 40,
         display: 'flex', flexDirection: 'column', gap: 8,
         fontFamily: 'system-ui, sans-serif',
       }}>
@@ -1029,7 +1386,7 @@ export default function SkyView({ onBack }) {
       </div>
 
       <div style={{
-        position: 'absolute', bottom: 20, left: '50%', transform: 'translateX(-50%)',
+        position: 'absolute', bottom: 44, left: '50%', transform: 'translateX(-50%)',
         color: 'rgba(160,190,255,0.4)', fontSize: 12, zIndex: 40,
         pointerEvents: 'none', whiteSpace: 'nowrap',
       }}>
@@ -1096,24 +1453,22 @@ function StarLabel({ starRef, camStateRef, rotationRef }) {
     planet:  { glow: 'rgba(255,170,60,0.9)' },
     moon:    { glow: 'rgba(200,210,240,0.9)' },
     sun:     { glow: 'rgba(255,200,80,0.9)' },
+    satellite: { glow: 'rgba(100,220,255,0.95)' },
   }
   const kc = kindColors[star.kind] || kindColors.star
 
   return (
     <div style={{
       position: 'absolute',
-      left: px,
-      top: py,
+      left: px, top: py,
       pointerEvents: 'none',
       zIndex: 35,
       transform: 'translate(-50%, -50%)',
-      width: 0,
-      height: 0,
+      width: 0, height: 0,
     }}>
       <div style={{
         position: 'absolute',
-        left: 0,
-        top: 24,
+        left: 0, top: 24,
         transform: 'translateX(-50%)',
         textAlign: 'center',
         whiteSpace: 'nowrap',
@@ -1121,8 +1476,7 @@ function StarLabel({ starRef, camStateRef, rotationRef }) {
         <div style={{
           color: '#e5e9f5',
           fontFamily: 'system-ui, sans-serif',
-          fontSize: 13,
-          fontWeight: 500,
+          fontSize: 13, fontWeight: 500,
           letterSpacing: '0.06em',
           textShadow: `0 0 8px ${kc.glow}, 0 0 16px ${kc.glow}`,
         }}>
@@ -1132,8 +1486,7 @@ function StarLabel({ starRef, camStateRef, rotationRef }) {
           <div style={{
             color: 'rgba(180,200,240,0.72)',
             fontFamily: 'system-ui, sans-serif',
-            fontSize: 11,
-            fontWeight: 400,
+            fontSize: 11, fontWeight: 400,
             letterSpacing: '0.05em',
             marginTop: 3,
             textShadow: '0 0 6px rgba(80,120,255,0.5)',
