@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
 import { loadBrightStarCatalog } from './starData'
 import SearchBar from './SearchBar'
 import { CITIES } from './cities'
@@ -26,67 +27,6 @@ const LIVE_SATELLITES = [
   { name: 'Hubble Space Telescope', norad: 20580 },
   { name: 'Tiangong', norad: 48274 },
 ]
-
-function makeSatelliteTexture() {
-  const c = document.createElement('canvas')
-  c.width = c.height = 128
-  const ctx = c.getContext('2d')
-  const halo = ctx.createRadialGradient(64, 64, 20, 64, 64, 62)
-  halo.addColorStop(0, 'rgba(100,220,255,0.55)')
-  halo.addColorStop(0.6, 'rgba(100,220,255,0.2)')
-  halo.addColorStop(1, 'rgba(100,220,255,0)')
-  ctx.fillStyle = halo
-  ctx.fillRect(0, 0, 128, 128)
-  ctx.fillStyle = '#3d6fc4'
-  ctx.fillRect(6, 50, 44, 28)
-  ctx.fillRect(78, 50, 44, 28)
-  ctx.strokeStyle = 'rgba(160,210,255,0.75)'
-  ctx.lineWidth = 1
-  for (let i = 1; i < 4; i++) {
-    ctx.beginPath()
-    ctx.moveTo(6 + i * 11, 50)
-    ctx.lineTo(6 + i * 11, 78)
-    ctx.stroke()
-    ctx.beginPath()
-    ctx.moveTo(78 + i * 11, 50)
-    ctx.lineTo(78 + i * 11, 78)
-    ctx.stroke()
-  }
-  ctx.strokeRect(6.5, 50.5, 43, 27)
-  ctx.strokeRect(78.5, 50.5, 43, 27)
-  ctx.fillStyle = '#eef4ff'
-  ctx.fillRect(52, 36, 24, 56)
-  ctx.fillStyle = 'rgba(140,180,230,0.85)'
-  ctx.fillRect(56, 42, 16, 5)
-  ctx.fillRect(56, 52, 16, 5)
-  ctx.fillRect(56, 62, 16, 5)
-  ctx.fillRect(56, 72, 16, 5)
-  ctx.fillStyle = '#a0c8f0'
-  ctx.fillRect(50, 62, 4, 4)
-  ctx.fillRect(74, 62, 4, 4)
-  ctx.strokeStyle = '#eef4ff'
-  ctx.lineWidth = 2
-  ctx.beginPath()
-  ctx.moveTo(64, 36)
-  ctx.lineTo(64, 18)
-  ctx.stroke()
-  ctx.beginPath()
-  ctx.arc(64, 16, 3.5, 0, Math.PI * 2)
-  ctx.fillStyle = '#ffffff'
-  ctx.fill()
-  ctx.strokeStyle = 'rgba(255,255,255,0.55)'
-  ctx.lineWidth = 1
-  ctx.beginPath()
-  ctx.moveTo(6, 50)
-  ctx.lineTo(50, 50)
-  ctx.moveTo(78, 50)
-  ctx.lineTo(122, 50)
-  ctx.stroke()
-  const tex = new THREE.CanvasTexture(c)
-  tex.minFilter = THREE.LinearFilter
-  tex.magFilter = THREE.LinearFilter
-  return tex
-}
 
 async function fetchSatTLE(norad) {
   const base = window.location.hostname === 'localhost'
@@ -394,6 +334,8 @@ export default function SkyView({ onBack }) {
   const satellitesRef = useRef([])
   const refreshSatellitesRef = useRef(null)
   const observerRef = useRef(null)
+  const issModelGroupRef = useRef(null)
+  const issModelReadyRef = useRef(false)
 
   const [observer, setObserver] = useState({
     name: 'Los Angeles',
@@ -743,21 +685,37 @@ export default function SkyView({ onBack }) {
       bodyMeshes[b.name] = { mesh, ringMesh, glowSprite, kind: b.kind, name: b.name }
     })
 
-    const satGeo = new THREE.BufferGeometry()
-    const satPosArr = new Float32Array(LIVE_SATELLITES.length * 3)
-    satGeo.setAttribute('position', new THREE.BufferAttribute(satPosArr, 3))
-    satGeo.setDrawRange(0, 0)
-    const satMat = new THREE.PointsMaterial({
-      map: makeSatelliteTexture(),
-      size: 34,
-      sizeAttenuation: false,
-      transparent: true,
-      depthWrite: false,
-      alphaTest: 0.01,
-    })
-    const satPoints = new THREE.Points(satGeo, satMat)
-    satPoints.visible = false
-    discScene.add(satPoints)
+    const issGroup = new THREE.Group()
+    issGroup.visible = false
+    discScene.add(issGroup)
+    issModelGroupRef.current = issGroup
+
+    try {
+      new GLTFLoader().load(
+        '/iss.glb',
+        (gltf) => {
+          try {
+            const model = gltf.scene
+            const box = new THREE.Box3().setFromObject(model)
+            const size = box.getSize(new THREE.Vector3())
+            const maxDim = Math.max(size.x, size.y, size.z) || 1
+            model.scale.setScalar(1 / maxDim)
+            const center = box.getCenter(new THREE.Vector3())
+            model.position.sub(center.multiplyScalar(1 / maxDim))
+            issGroup.add(model)
+            issModelReadyRef.current = true
+          } catch (e) {
+            console.warn('ISS model setup failed:', e)
+          }
+        },
+        undefined,
+        () => {
+          console.warn('ISS model not found or failed to load')
+        }
+      )
+    } catch (e) {
+      console.warn('GLTFLoader error:', e)
+    }
 
     let yaw = 0
     let pitch = 0
@@ -926,7 +884,7 @@ export default function SkyView({ onBack }) {
 
       const obj = findObjectAt(e.clientX, e.clientY)
       setSelectedObject(obj || null)
-      highlightedStarRef.current = null
+      if (!obj) highlightedStarRef.current = null
     }
 
     function onWheel(e) {
@@ -995,30 +953,25 @@ export default function SkyView({ onBack }) {
         -Math.cos(yaw) * Math.sin(pitch)
       )
 
-      if (satellitesRef.current.length > 0) {
-        const posAttr = satPoints.geometry.attributes.position
-        let visibleIdx = 0
-        for (const s of satellitesRef.current) {
-          const [sx, sy, sz] = raDecToXYZ(s.ra, s.dec, 1)
-          const v = new THREE.Vector3(sx, sy, sz).applyMatrix4(rotationRef.current).normalize()
-          const vzS = v.dot(Fv)
-          if (vzS <= 0.001) continue
-          const vxS = v.dot(Rv)
-          const vyS = v.dot(Uv)
-          const thetaS = Math.acos(Math.max(-1, Math.min(1, vzS)))
-          const rS = (thetaS / (fov * 0.5)) * maxR
-          const sinTS = Math.sin(thetaS)
-          if (sinTS < 0.0001) continue
-          const px = (vxS / sinTS) * rS
-          const py = (vyS / sinTS) * rS
-          posAttr.setXYZ(visibleIdx, px, py, 0)
-          visibleIdx++
+      if (issModelReadyRef.current && issModelGroupRef.current) {
+        const iss = satellitesRef.current.find(s => s.norad === 25544)
+        let show = false
+        if (iss && fov < 0.08) {
+          const pos = projectToScreen(iss.ra, iss.dec)
+          if (pos) {
+            const cx = window.innerWidth / 2
+            const cy = window.innerHeight / 2
+            if (Math.hypot(pos.x - cx, pos.y - cy) < 250) {
+              show = true
+              const wx = ((pos.x / window.innerWidth) * 2 - 1) * aspect
+              const wy = 1 - (pos.y / window.innerHeight) * 2
+              issModelGroupRef.current.position.set(wx, wy, 0)
+              issModelGroupRef.current.scale.setScalar(0.35)
+              issModelGroupRef.current.rotation.y += 0.005
+            }
+          }
         }
-        posAttr.needsUpdate = true
-        satPoints.geometry.setDrawRange(0, visibleIdx)
-        satPoints.visible = visibleIdx > 0
-      } else {
-        satPoints.visible = false
+        issModelGroupRef.current.visible = show
       }
 
       let anyDiscLarge = false
@@ -1126,6 +1079,8 @@ export default function SkyView({ onBack }) {
       highlightStarRef.current = null
       highlightedStarRef.current = null
       refreshSatellitesRef.current = null
+      issModelGroupRef.current = null
+      issModelReadyRef.current = false
     }
   }, [])
 
@@ -1136,7 +1091,7 @@ export default function SkyView({ onBack }) {
     rotationRef.current.copy(m)
     starGroupRef.current.setRotationFromMatrix(m)
 
-    solarBodiesRef.current = getSolarSystemBodies(obsTime, observer.latitude, observer.longitude)
+    solarBodiesRef.current = getSolarBodies = getSolarSystemBodies(obsTime, observer.latitude, observer.longitude)
 
     if (recaptureRef.current) recaptureRef.current()
     if (refreshSatellitesRef.current) refreshSatellitesRef.current()

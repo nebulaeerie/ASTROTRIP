@@ -5,6 +5,7 @@ import PostsPage from './PostsPage'
 import GamesMenu from './GamesMenu'
 import { loadBrightStarCatalog } from './starData'
 import SkyView from './SkyView'
+import SatelliteOrbitView from './SatelliteOrbitView'
 import SearchBar from './SearchBar'
 
 const BODIES = [
@@ -552,6 +553,7 @@ export default function App() {
   const [page, setPage] = useState(null)
   const flyToRef = useRef(null)
   const [showFavs, setShowFavs] = useState(false)
+  const [orbitTarget, setOrbitTarget] = useState(null)
   const [ready, setReady] = useState(false)
   const [favorites, setFavorites] = useState(() => {
     try { return JSON.parse(localStorage.getItem('astroFavs') || '[]') } catch { return [] }
@@ -938,7 +940,17 @@ export default function App() {
         </div>
       )}
 
-      {page === 'AstroGaze' && <SkyView onBack={() => setPage(null)} />}
+     {page === 'AstroGaze' && (
+  orbitTarget
+    ? <SatelliteOrbitView
+        target={orbitTarget}
+        onBack={() => setOrbitTarget(null)}
+      />
+    : <SkyView
+        onBack={() => setPage(null)}
+        onOpenOrbitView={(data) => setOrbitTarget(data)}
+      />
+)}
 
       {!selected && !page && (
         <div style={{ position:'absolute', bottom:'22px', left:'50%', transform:'translateX(-50%)', color:'rgba(160,190,255,0.35)', fontSize:'0.76rem', display:'flex', gap:'10px', zIndex:10, whiteSpace:'nowrap' }}>
