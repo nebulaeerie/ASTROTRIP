@@ -1091,7 +1091,7 @@ export default function SkyView({ onBack }) {
     rotationRef.current.copy(m)
     starGroupRef.current.setRotationFromMatrix(m)
 
-    solarBodiesRef.current = getSolarBodies = getSolarSystemBodies(obsTime, observer.latitude, observer.longitude)
+    solarBodiesRef.current = getSolarSystemBodies(obsTime, observer.latitude, observer.longitude)
 
     if (recaptureRef.current) recaptureRef.current()
     if (refreshSatellitesRef.current) refreshSatellitesRef.current()

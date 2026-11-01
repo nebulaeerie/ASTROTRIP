@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { supabase } from './supabaseClient'
 import { LANGUAGES } from './languages'
+import CommentSection from './CommentSection'
 
 const META = {
   article:  { label: 'Articles',  eyebrow: 'From the Observatory',  empty: 'No articles published yet.' },
@@ -36,6 +37,71 @@ function AlienSvg({ hue = 0 }) {
       <circle cx="62.5" cy="41" r="2.5" fill="#ffffff"/>
       <path d="M44 57 Q50 60 56 57" stroke={stroke} strokeWidth="1.5" fill="none" strokeLinecap="round"/>
     </svg>
+  )
+}
+
+function MeteorOverlay() {
+  const [gone, setGone] = useState(false)
+  const [fading, setFading] = useState(false)
+
+  const [reduced] = useState(() =>
+    typeof window !== 'undefined' &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches
+  )
+
+  const [meteors] = useState(() => {
+    const isMobile = typeof window !== 'undefined' && window.innerWidth < 768
+    const count = isMobile ? 40 : 70
+    return Array.from({ length: count }, (_, i) => ({
+      id: i,
+      top: -20 + Math.random() * 60,
+      left: -20 + Math.random() * 90,
+      length: (isMobile ? 40 : 70) + Math.random() * (isMobile ? 60 : 140),
+      angle: 32 + Math.random() * 25,
+      delay: Math.random() * 2.8,
+      duration: 0.9 + Math.random() * 1.1,
+      hue: 195 + Math.random() * 40,
+    }))
+  })
+
+  useEffect(() => {
+    if (reduced) { setGone(true); return }
+    const fadeT = setTimeout(() => setFading(true), 4600)
+    const goneT = setTimeout(() => setGone(true), 5600)
+    return () => { clearTimeout(fadeT); clearTimeout(goneT) }
+  }, [reduced])
+
+  if (gone || reduced) return null
+
+  return (
+    <div aria-hidden="true" style={{ position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 450, overflow: 'hidden', opacity: fading ? 0 : 1, transition: 'opacity 1s ease' }}>
+      {meteors.map(m => (
+        <div
+          key={m.id}
+          style={{
+            position: 'absolute',
+            top: `${m.top}%`,
+            left: `${m.left}%`,
+            width: m.length,
+            height: 2,
+            background: `linear-gradient(to right, hsla(${m.hue}, 90%, 75%, 0) 0%, hsla(${m.hue}, 90%, 85%, 0.85) 60%, #ffffff 100%)`,
+            borderRadius: '2px',
+            filter: `drop-shadow(0 0 4px hsla(${m.hue}, 90%, 80%, 0.9))`,
+            '--angle': `${m.angle}deg`,
+            animation: `meteorFall ${m.duration}s linear ${m.delay}s forwards`,
+            opacity: 0,
+          }}
+        />
+      ))}
+      <style>{`
+        @keyframes meteorFall {
+          0%   { transform: rotate(var(--angle)) translateX(0); opacity: 0; }
+          10%  { opacity: 1; }
+          80%  { opacity: 1; }
+          100% { transform: rotate(var(--angle)) translateX(180vw); opacity: 0; }
+        }
+      `}</style>
+    </div>
   )
 }
 
@@ -495,6 +561,8 @@ function PostModal({ post, lang, onClose, posts, onNavigate }) {
   const prevPost = idx > 0 ? seriesSiblings[idx - 1] : null
   const nextPost = idx >= 0 && idx < seriesSiblings.length - 1 ? seriesSiblings[idx + 1] : null
 
+  const [commentsOpen, setCommentsOpen] = useState(false)
+
   useEffect(() => {
     document.body.style.overflow = 'hidden'
     const onKey = e => { if (e.key === 'Escape') onClose() }
@@ -504,8 +572,10 @@ function PostModal({ post, lang, onClose, posts, onNavigate }) {
 
   return (
     <div onClick={onClose} style={{ position: 'fixed', inset: 0, zIndex: 300, background: 'rgba(0,0,10,0.85)', backdropFilter: 'blur(12px)', display: 'flex', alignItems: 'flex-start', justifyContent: 'center', overflowY: 'auto', padding: 'clamp(16px,6vw,48px) clamp(8px,3vw,24px)' }}>
+     {body.includes('{{WIDGET:meteor-shower}}') && <MeteorOverlay />}
      {body.includes('{{WIDGET:color-mixer}}') && <GreenAliensOverlay />}
       <div onClick={e => e.stopPropagation()} style={{ background: 'rgba(4,6,26,0.98)', border: '1px solid rgba(100,140,255,0.2)', borderRadius: '20px', maxWidth: '1100px', width: '100%', position: 'relative', boxShadow: '0 24px 80px rgba(0,0,60,0.7)', overflow: 'hidden', direction: lang.dir }}>
+               <button onClick={onClose} style={{ position: 'absolute', top: '16px', left: '16px', background: 'rgba(8,12,40,0.85)', border: '1px solid rgba(100,140,255,0.35)', color: 'rgba(200,220,255,0.9)', padding: '8px 14px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.78rem', fontFamily: 'inherit', zIndex: 11, backdropFilter: 'blur(8px)' }}>← Back</button>
         <button onClick={onClose} style={{ position: 'absolute', top: '16px', right: '16px', background: 'rgba(80,110,200,0.15)', border: '1px solid rgba(100,140,255,0.2)', color: 'rgba(200,220,255,0.7)', width: '36px', height: '36px', borderRadius: '50%', cursor: 'pointer', fontSize: '0.9rem', zIndex: 10 }}>✕</button>
         {post.cover_image && (
           <img src={post.cover_image} alt={title} style={{ width: '100%', maxWidth: '850px', height: 'auto', display: 'block', margin: '0 auto' }} />
@@ -534,6 +604,31 @@ function PostModal({ post, lang, onClose, posts, onNavigate }) {
               )
             )}
           </div>
+
+          <div style={{ marginTop: 40, display: 'flex', justifyContent: 'flex-start' }}>
+            <button
+              onClick={() => setCommentsOpen(o => !o)}
+              style={{
+                background: 'rgba(80,110,200,0.1)',
+                border: '1px solid rgba(100,140,255,0.25)',
+                color: 'rgba(200,220,255,0.85)',
+                padding: '10px 18px',
+                borderRadius: 10,
+                cursor: 'pointer',
+                fontSize: '0.82rem',
+                fontFamily: 'inherit',
+              }}
+            >
+              💬 {commentsOpen ? 'Hide comments' : 'Comments'}
+            </button>
+          </div>
+
+          <CommentSection
+            targetType="article"
+            targetId={post.id}
+            open={commentsOpen}
+            onClose={() => setCommentsOpen(false)}
+          />
 
           {(prevPost || nextPost) && (
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', marginTop: '40px', paddingTop: '24px', borderTop: '1px solid rgba(80,110,200,0.15)' }}>

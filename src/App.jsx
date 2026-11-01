@@ -7,6 +7,8 @@ import { loadBrightStarCatalog } from './starData'
 import SkyView from './SkyView'
 import SatelliteOrbitView from './SatelliteOrbitView'
 import SearchBar from './SearchBar'
+import SpaceSound from './audio/SpaceSound'
+
 
 const BODIES = [
   { name: 'Sun',     texture: '/2k_sun.jpg',           fallback: 0xffdd00, size: 16,  distance: 0,   speed: 0,       emissive: true,  glowColor: '#ffaa00', glowSize: 1.35, info: 'The Sun contains 99.86% of the Solar System mass. Core temperature reaches 15 million degrees.', stats: { Type: 'G-type Star', Diameter: '1,392,700 km', 'Surface Temp': '5,500 C', Age: '4.6 billion yrs' } },
@@ -555,7 +557,7 @@ export default function App() {
   const [showFavs, setShowFavs] = useState(false)
   const [orbitTarget, setOrbitTarget] = useState(null)
   const [ready, setReady] = useState(false)
-  const [favorites, setFavorites] = useState(() => {
+    const [favorites, setFavorites] = useState(() => {
     try { return JSON.parse(localStorage.getItem('astroFavs') || '[]') } catch { return [] }
   })
 
@@ -874,25 +876,7 @@ export default function App() {
       <div ref={mountRef} style={{ width:'100%', height:'100%', position:'absolute', inset:0 }} />
       <div style={{ position:'absolute', inset:0, background:'#02030f', transition:'opacity 1.4s ease', opacity: ready ? 0 : 1, pointerEvents:'none', zIndex:50 }} />
 
-      <div className="dev-banner" style={{
-        position: 'fixed',
-        top: 56,
-        left: 0,
-        right: 0,
-        zIndex: 200,
-        background: 'linear-gradient(90deg, rgba(18, 0, 117, 0.95), rgba(3, 20, 116, 0.95))',
-        color: '#f5f2f0',
-        fontFamily: 'system-ui, sans-serif',
-        fontSize: 12,
-        fontWeight: 600,
-        letterSpacing: '0.08em',
-        textAlign: 'center',
-        padding: '6px 16px',
-        pointerEvents: 'none',
-        textShadow: '0 1px 0 rgba(255,255,255,0.25)',
-      }}>
-        THIS WEBSITE IS UNDER DEVELOPMENT
-      </div>
+    
 
   
       
@@ -909,6 +893,7 @@ export default function App() {
           <button style={nb(page === 'AstroGames')} onClick={() => { setPage('AstroGames'); setSelected(null) }}>AstroGames</button>
           <button style={nb(page === 'AstroReport')} onClick={() => { setPage('AstroReport'); setSelected(null) }}>AstroReport</button>
           <button style={nb(page === 'AstroGaze')} onClick={() => { setPage('AstroGaze'); setSelected(null) }}>AstroGaze</button>
+
           <button style={{ ...nb(showFavs), fontSize:'1rem', padding:'clamp(5px,1.5vw,7px) clamp(8px,2.5vw,12px)', display:'flex', alignItems:'center', gap:'5px' }} onClick={() => setShowFavs(v => !v)}>
             ★{favorites.length > 0 && <span style={{ background:'#5577ff', color:'#fff', borderRadius:'10px', fontSize:'0.68rem', padding:'1px 5px', fontWeight:600 }}>{favorites.length}</span>}
           </button>
@@ -949,14 +934,84 @@ export default function App() {
     : <SkyView
         onBack={() => setPage(null)}
         onOpenOrbitView={(data) => setOrbitTarget(data)}
+
       />
 )}
 
-      {!selected && !page && (
-        <div style={{ position:'absolute', bottom:'22px', left:'50%', transform:'translateX(-50%)', color:'rgba(160,190,255,0.35)', fontSize:'0.76rem', display:'flex', gap:'10px', zIndex:10, whiteSpace:'nowrap' }}>
-          <span>Drag to rotate</span><span>·</span><span>Scroll to zoom</span><span>·</span><span>Tap a planet to explore</span>
-        </div>
-      )}
+
+ {!selected && !page && (
+  <>
+    <style>{`
+      @keyframes pillSweep {
+        0%   { transform: translateX(-100%); opacity: 0; }
+        50%  { transform: translateX(100%);  opacity: 1; }
+        100% { transform: translateX(-100%); opacity: 0; }
+      }
+      @keyframes pillPulse {
+        0%, 100% { opacity: 0.4; }
+        50%      { opacity: 1;   }
+      }
+    `}</style>
+
+    <div style={{
+      position: 'absolute',
+      bottom: '22px',
+      left: '50%',
+      transform: 'translateX(-50%)',
+      zIndex: 25,
+      whiteSpace: 'nowrap',
+    }}>
+
+      {/* outer glow — pulses, not clipped by the pill */}
+      <div style={{
+        position: 'absolute',
+        inset: -6,
+        borderRadius: '999px',
+        background: 'radial-gradient(ellipse at center, rgba(100, 140, 255, 0.4) 0%, rgba(100, 140, 255, 0) 70%)',
+        filter: 'blur(10px)',
+        animation: 'pillPulse 4s ease-in-out infinite',
+        pointerEvents: 'none',
+      }} />
+
+      {/* the pill */}
+      <div style={{
+        position: 'relative',
+        overflow: 'hidden',
+        padding: '10px 22px',
+        borderRadius: '999px',
+        background: 'rgba(4, 6, 26, 0.7)',
+        border: '1px solid rgba(100, 140, 255, 0.28)',
+        backdropFilter: 'blur(10px)',
+        fontFamily: 'Georgia, serif',
+        fontSize: '0.9rem',
+        fontStyle: 'italic',
+        letterSpacing: '0.04em',
+        color: 'rgba(200, 220, 255, 0.7)',
+        textShadow: '0 0 10px rgba(140, 180, 255, 0.35)',
+      }}>
+
+        {/* sweep layer — the moving glow */}
+        <div style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          width: '100%',
+          height: '100%',
+          background: 'linear-gradient(90deg, transparent 0%, transparent 30%, rgba(160, 200, 255, 0.5) 50%, transparent 70%, transparent 100%)',
+          mixBlendMode: 'screen',
+          animation: 'pillSweep 10s ease-in-out infinite',
+          pointerEvents: 'none',
+        }} />
+
+        {/* text — sits above the sweep */}
+        <span style={{ position: 'relative', zIndex: 1 }}>
+          This is your first trip to space. Buckle up and explore.
+        </span>
+
+      </div>
+    </div>
+  </>
+)}
 
       {selected && !page && (
         <div style={{ position:'absolute', bottom:'clamp(12px,4vw,28px)', left:'clamp(12px,4vw,24px)', background:'rgba(4,6,26,0.93)', border:'1px solid rgba(100,140,255,0.22)', borderRadius:'16px', padding:'clamp(16px,4vw,26px)', maxWidth:'320px', width:'calc(100vw - clamp(24px,8vw,48px))', backdropFilter:'blur(20px)', zIndex:10, boxShadow:'0 8px 48px rgba(0,0,70,0.6)', animation:'slideUp 0.35s cubic-bezier(0.16,1,0.3,1)' }}>
@@ -980,7 +1035,7 @@ export default function App() {
         </div>
       )}
 
-      {showFavs && (
+          {showFavs && (
         <div style={{ position:'absolute', top:'68px', right:'24px', background:'rgba(4,6,26,0.94)', border:'1px solid rgba(100,140,255,0.2)', borderRadius:'14px', padding:'18px', minWidth:'190px', backdropFilter:'blur(20px)', zIndex:20, boxShadow:'0 8px 32px rgba(0,0,60,0.5)' }}>
           <div style={{ color:'#99bbff', fontSize:'0.82rem', letterSpacing:'0.12em', marginBottom:'12px', fontWeight:500 }}>★ Favorites</div>
           {favorites.length === 0
@@ -993,6 +1048,9 @@ export default function App() {
             ))}
         </div>
       )}
+
+      <SpaceSound />
+
     </div>
   )
 }

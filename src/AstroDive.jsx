@@ -365,9 +365,9 @@ export default function AstroDive({ onBack }) {
     <div style={s.root}>
       <button style={s.backBtn} onClick={onBack}>← Games</button>
       <div style={s.menuBox}>
-        <div style={s.icon}>🚀</div>
+       <div style={{ width: '96px', height: '96px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(204,68,255,0.4) 0%, rgba(204,68,255,0.12) 50%, transparent 75%)', boxShadow: '0 0 60px rgba(204,68,255,0.3)' }} />
         <h1 style={s.title}>Astro Dive</h1>
-        <p style={s.subtitle}>Fly through the Solar System. Collect stars. Avoid asteroids and planet collisions.</p>
+        <p style={s.subtitle}>Collect stars. Avoid asteroids and planet collisions.</p>
         <p style={s.subtitle}>Choose your perspective:</p>
         <div style={s.modeRow}>
           <button style={s.modeBtn} onClick={() => { setMode('topdown'); setLives(3); setScore(0); setPhase('playing') }}>

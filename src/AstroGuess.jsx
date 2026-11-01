@@ -177,9 +177,9 @@ export default function AstroGuess({ onBack }) {
     <div style={s.root}>
       <button style={s.backBtn} onClick={onBack}>← Games</button>
       <div style={s.menuBox}>
-        <div style={s.icon}>🔭</div>
+       <div style={{ width: '96px', height: '96px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,204,68,0.4) 0%, rgba(255,204,68,0.12) 50%, transparent 75%)', boxShadow: '0 0 60px rgba(255,204,68,0.3)' }} />
         <h1 style={s.title}>Astro Guess</h1>
-        <p style={s.subtitle}>Read the clues one by one. The fewer clues you need, the more points you earn. Maximum 200 points per planet.</p>
+        <p style={s.subtitle}>Read the clues one by one. The fewer clues you need, the more points you earn.</p>
         <div style={s.pointsGuide}>
           <div style={s.pgRow}><span>1 clue</span><span style={{ color: '#ffcc44' }}>200 pts</span></div>
           <div style={s.pgRow}><span>2 clues</span><span style={{ color: '#ffcc44' }}>160 pts</span></div>

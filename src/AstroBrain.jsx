@@ -110,9 +110,9 @@ export default function AstroBrain({ onBack }) {
     <div style={s.root}>
       <button style={s.backBtn} onClick={onBack}>← Games</button>
       <div style={s.menuBox}>
-        <div style={s.gameIcon}>🧠</div>
         <h1 style={s.gameTitle}>Astro Brain</h1>
-        <p style={s.gameSubtitle}>5 questions · 60 seconds · Score based on speed and accuracy</p>
+
+       <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(68,102,255,0.35) 0%, rgba(68,102,255,0.1) 50%, transparent 75%)', boxShadow: '0 0 40px rgba(68,102,255,0.25)', margin: '0 auto 14px' }} />
         {error && <div style={s.error}>{error}</div>}
         <button style={s.startBtn} onClick={startGame}>Start Game</button>
         {highScores.length > 0 && (

@@ -3,40 +3,49 @@ import AstroGuess from './AstroGuess'
 import AstroBuild from './AstroBuild'
 import AstroDive from './AstroDive'
 import { useState } from 'react'
+import AstroHit from './AstroHit'
 
 const GAMES = [
   {
     id: 'brain',
     name: 'Astro Brain',
-    icon: '🧠',
-    desc: 'Test your astronomy knowledge. 5 questions, 1 minute, how high can you score?',
+    code: 'BR',
+    desc: 'Test your astronomy knowledge!',
     color: '#4466ff',
     glow: 'rgba(68,102,255,0.3)',
   },
   {
     id: 'guess',
     name: 'Astro Guess',
-    icon: '🔭',
-    desc: 'Read the clues. Guess the planet. The fewer clues you need, the higher your score.',
-    color: '#ff6622',
-    glow: 'rgba(255,102,34,0.3)',
+    code: 'GU',
+    desc: 'Guess the planet!',
+    color: '#ffee05',
+    glow: 'rgba(248, 182, 0, 0.4)',
   },
   {
     id: 'build',
     name: 'Astro Build',
-    icon: '🪐',
-    desc: 'Design your own planet. Customize its properties and find out if life could exist on it.',
+    code: 'BU',
+    desc: 'Design your own planet!',
     color: '#22cc88',
     glow: 'rgba(34,204,136,0.3)',
   },
   {
     id: 'dive',
     name: 'Astro Dive',
-    icon: '🚀',
-    desc: 'Fly through the solar system. Choose top-down or first-person. Collect stars, dodge asteroids.',
+    code: 'DI',
+    desc: 'Fly through the solar system!',
     color: '#cc44ff',
     glow: 'rgba(204,68,255,0.3)',
   },
+  {
+  id: 'hit',
+  name: 'Astro Hit',
+  code: 'HI',
+  desc: 'Hit or miss!',
+  color: '#ff7b00',
+  glow: 'rgba(255,102,34,0.3)',
+},
 ]
 
 export default function GamesMenu({ onBack }) {
@@ -46,7 +55,7 @@ export default function GamesMenu({ onBack }) {
   if (active === 'guess') return <AstroGuess onBack={() => setActive(null)} />
   if (active === 'build') return <AstroBuild onBack={() => setActive(null)} />
   if (active === 'dive')  return <AstroDive  onBack={() => setActive(null)} />
-
+  if (active === 'hit') return <AstroHit onBack={() => setActive(null)} />
   return (
     <div style={s.root}>
       <div style={s.bg} />
