@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useAuth } from './Auth'
 
 function getHighScore() { try { return parseInt(localStorage.getItem('astroHitHS') || '0') } catch { return 0 } }
 function saveHighScore(s) { try { localStorage.setItem('astroHitHS', String(s)) } catch {} }
@@ -44,311 +45,27 @@ const SFX = {
   },
 }
 
-function hash(n) {
-  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453
-  return x - Math.floor(x)
-}
-
-// ------------------------------------------------------------------
-// STATIC MOON TEXTURE — generated once at module load
-// ------------------------------------------------------------------
-function genMoonTexture() {
-  const craters = []
-  const specks = []
-  const maria = []
-
-  const mariaGroups = [
-    { alpha: 0.40, circles: [
-      { dx: -0.28, dy: -0.18, r: 0.24 },
-      { dx: -0.18, dy: -0.08, r: 0.20 },
-      { dx: -0.34, dy:  0.02, r: 0.17 },
-    ]},
-    { alpha: 0.36, circles: [
-      { dx:  0.22, dy: -0.22, r: 0.19 },
-      { dx:  0.32, dy: -0.10, r: 0.15 },
-      { dx:  0.15, dy: -0.30, r: 0.13 },
-    ]},
-    { alpha: 0.34, circles: [
-      { dx:  0.12, dy:  0.30, r: 0.22 },
-      { dx:  0.26, dy:  0.22, r: 0.15 },
-    ]},
-    { alpha: 0.30, circles: [
-      { dx: -0.32, dy:  0.28, r: 0.13 },
-      { dx: -0.22, dy:  0.36, r: 0.11 },
-    ]},
-    { alpha: 0.28, circles: [
-      { dx:  0.36, dy:  0.30, r: 0.12 },
-    ]},
-  ]
-  mariaGroups.forEach(m => maria.push(m))
-
-  for (let i = 0; i < 42; i++) {
-    const ang = hash(i * 3 + 1) * Math.PI * 2
-    const dist = Math.sqrt(hash(i * 3 + 2)) * 0.93
-    const size = 0.012 + hash(i * 3 + 3) * 0.05
-    craters.push({
-      u: Math.cos(ang) * dist,
-      v: Math.sin(ang) * dist,
-      r: size,
-    })
-  }
-
-  for (let i = 0; i < 140; i++) {
-    const ang = hash(i + 5000) * Math.PI * 2
-    const dist = Math.sqrt(hash(i + 6000)) * 0.95
-    specks.push({
-      u: Math.cos(ang) * dist,
-      v: Math.sin(ang) * dist,
-      r: 0.004 + hash(i + 7000) * 0.011,
-      dark: hash(i + 8000) > 0.5,
-    })
-  }
-
-  return { craters, specks, maria }
-}
-
-const MOON_TEXTURE = genMoonTexture()
-
-// ------------------------------------------------------------------
-// CRATER — realistic interior shadow + rim highlight
-// ------------------------------------------------------------------
-function drawCrater(ctx, cx, cy, r, hot) {
-  if (r < 0.6) return
-  const lw = Math.max(1, r * 0.1)
-
-  // Bowl interior — overall shadow
-  ctx.beginPath()
-  ctx.arc(cx, cy, r * 0.85, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(28, 22, 16, 0.35)'
-  ctx.fill()
-
-  // Extra-dark inner shadow toward the light source (upper-left)
-  ctx.beginPath()
-  ctx.arc(cx - r * 0.22, cy - r * 0.22, r * 0.6, 0, Math.PI * 2)
-  ctx.fillStyle = 'rgba(8, 6, 3, 0.38)'
-  ctx.fill()
-
-  // Bright rim on far side (lower-right)
-  ctx.beginPath()
-  ctx.arc(cx, cy, r * 0.92, Math.PI * 0.1, Math.PI * 0.9)
-  ctx.strokeStyle = 'rgba(252, 246, 232, 0.5)'
-  ctx.lineWidth = lw
-  ctx.stroke()
-
-  // Dark rim on near side (upper-left)
-  ctx.beginPath()
-  ctx.arc(cx, cy, r * 0.92, Math.PI * 1.15, Math.PI * 1.85)
-  ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)'
-  ctx.lineWidth = lw
-  ctx.stroke()
-
-  if (hot) {
-    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
-    g.addColorStop(0, 'rgba(255, 170, 70, 0.45)')
-    g.addColorStop(1, 'rgba(255, 80, 20, 0)')
-    ctx.beginPath()
-    ctx.arc(cx, cy, r, 0, Math.PI * 2)
-    ctx.fillStyle = g
-    ctx.fill()
-  }
-}
-
-// ------------------------------------------------------------------
-// BAKE MOON BASE — done once, then blitted every frame
-// ------------------------------------------------------------------
-function bakeMoonBase(r) {
-  const pad = 30
-  const size = Math.ceil(r * 2 + pad * 2)
-  const c = document.createElement('canvas')
-  c.width = size
-  c.height = size
-  const bctx = c.getContext('2d')
-  const cx = size / 2
-  const cy = size / 2
-
-  // Base sphere gradient — light from upper-left
-  const grad = bctx.createRadialGradient(cx - r * 0.42, cy - r * 0.42, r * 0.08, cx, cy, r)
-  grad.addColorStop(0,    '#f4f0e4')
-  grad.addColorStop(0.35, '#d8d2c2')
-  grad.addColorStop(0.7,  '#a29c8e')
-  grad.addColorStop(0.95, '#4a4236')
-  grad.addColorStop(1,    '#2a2418')
-  bctx.beginPath()
-  bctx.arc(cx, cy, r, 0, Math.PI * 2)
-  bctx.fillStyle = grad
-  bctx.fill()
-
-  bctx.save()
-  bctx.beginPath()
-  bctx.arc(cx, cy, r, 0, Math.PI * 2)
-  bctx.clip()
-
-  // Maria
-  MOON_TEXTURE.maria.forEach(m => {
-    m.circles.forEach(circ => {
-      bctx.beginPath()
-      bctx.arc(cx + circ.dx * r, cy + circ.dy * r, circ.r * r, 0, Math.PI * 2)
-      bctx.fillStyle = `rgba(52, 46, 36, ${m.alpha})`
-      bctx.fill()
-    })
-  })
-
-  // Static terrain craters
-  MOON_TEXTURE.craters.forEach(cr => {
-    drawCrater(bctx, cx + cr.u * r, cy + cr.v * r, cr.r * r, false)
-  })
-
-  // Grain
-  MOON_TEXTURE.specks.forEach(sp => {
-    bctx.beginPath()
-    bctx.arc(cx + sp.u * r, cy + sp.v * r, sp.r * r, 0, Math.PI * 2)
-    bctx.fillStyle = sp.dark ? 'rgba(28, 22, 16, 0.4)' : 'rgba(248, 244, 232, 0.22)'
-    bctx.fill()
-  })
-
-  // Limb darkening
-  const limb = bctx.createRadialGradient(cx, cy, r * 0.6, cx, cy, r)
-  limb.addColorStop(0, 'rgba(0, 0, 0, 0)')
-  limb.addColorStop(1, 'rgba(0, 0, 0, 0.58)')
-  bctx.beginPath()
-  bctx.arc(cx, cy, r, 0, Math.PI * 2)
-  bctx.fillStyle = limb
-  bctx.fill()
-
-  bctx.restore()
-
-  // Bright limb on lit side
-  bctx.beginPath()
-  bctx.arc(cx, cy, r - 0.6, -Math.PI * 0.78, Math.PI * 0.12)
-  bctx.strokeStyle = 'rgba(255, 252, 240, 0.55)'
-  bctx.lineWidth = 1.8
-  bctx.stroke()
-
-  return { canvas: c, cx, cy }
-}
-
-// ------------------------------------------------------------------
-// IMPACT EFFECTS — fireball, shockwave, ejecta, dust
-// ------------------------------------------------------------------
-function drawImpactEffects(ctx, moon, imp) {
-  const px = moon.x + imp.u * moon.r
-  const py = moon.y + imp.v * moon.r
-  const craterR = imp.size * Math.min(1, imp.age / 10) * 0.8
-
-  // Fireball
-  if (imp.age < 15) {
-    const ft = imp.age / 15
-    const fr = imp.size * (1 + ft * 4.5)
-    const g = ctx.createRadialGradient(px, py, 0, px, py, fr)
-    g.addColorStop(0,    `rgba(255, 255, 255, ${1 - ft})`)
-    g.addColorStop(0.2,  `rgba(255, 245, 210, ${(1 - ft) * 0.9})`)
-    g.addColorStop(0.5,  `rgba(255, 180, 60,  ${(1 - ft) * 0.6})`)
-    g.addColorStop(0.8,  `rgba(255, 90,  25,  ${(1 - ft) * 0.3})`)
-    g.addColorStop(1,    'rgba(200, 40, 0, 0)')
-    ctx.beginPath()
-    ctx.arc(px, py, fr, 0, Math.PI * 2)
-    ctx.fillStyle = g
-    ctx.fill()
-  }
-
-  // Shockwave
-  if (imp.age >= 1 && imp.age < 26) {
-    const st = (imp.age - 1) / 25
-    const sr = imp.size * (0.6 + st * 9)
-    const alpha = (1 - st) * 0.55
-    ctx.beginPath()
-    ctx.arc(px, py, sr, 0, Math.PI * 2)
-    ctx.strokeStyle = `rgba(255, 220, 160, ${alpha})`
-    ctx.lineWidth = 1.5 + st * 0.8
-    ctx.stroke()
-  }
-
-  // Ejecta rays
-  if (imp.age >= 3 && imp.age < 30) {
-    const rt = (imp.age - 3) / 27
-    const alpha = (1 - rt) * 0.7
-    for (let i = 0; i < 16; i++) {
-      const jitter = Math.sin(i * 7.3 + imp.seed) * 0.18
-      const ang = (i / 16) * Math.PI * 2 + jitter
-      const rayLen = imp.size * (1 + rt * 5) * (0.55 + hash(i + imp.seed) * 0.9)
-      const x0 = px + Math.cos(ang) * craterR * 0.8
-      const y0 = py + Math.sin(ang) * craterR * 0.8
-      const x1 = px + Math.cos(ang) * rayLen
-      const y1 = py + Math.sin(ang) * rayLen
-      ctx.beginPath()
-      ctx.moveTo(x0, y0)
-      ctx.lineTo(x1, y1)
-      ctx.strokeStyle = `rgba(255, 225, 185, ${alpha})`
-      ctx.lineWidth = Math.max(0.4, 2 * (1 - rt))
-      ctx.stroke()
-    }
-  }
-
-  // Dust plume
-  if (imp.age >= 5 && imp.age < 70) {
-    const pt = (imp.age - 5) / 65
-    const rise = pt * imp.size * 8
-    const alpha = (1 - pt) * 0.32
-    for (let i = 0; i < 8; i++) {
-      const jitter = Math.sin(i * 3.7 + imp.seed) * imp.size * 1.5
-      const puffY = py - rise * (0.3 + hash(i * 2 + imp.seed) * 1.0)
-      const puffR = imp.size * (0.6 + pt * 1.6) * (0.5 + hash(i * 5 + imp.seed) * 0.7)
-      ctx.beginPath()
-      ctx.arc(px + jitter * (0.3 + pt * 1.2), puffY, puffR, 0, Math.PI * 2)
-      ctx.fillStyle = `rgba(165, 145, 125, ${alpha * 0.55})`
-      ctx.fill()
-    }
-  }
-}
-
-// ------------------------------------------------------------------
-// LOCK-ON
-// ------------------------------------------------------------------
-function drawLockOn(ctx, cx, cy, r, t) {
-  const alpha = 0.6 + Math.sin(t * 0.012) * 0.3
-  const size = r * 0.35
-  const offset = r + 12
-
-  ctx.save()
-  ctx.shadowColor = 'rgba(255, 221, 68, 0.75)'
-  ctx.shadowBlur = 14
-  ctx.strokeStyle = `rgba(255, 221, 68, ${alpha})`
-  ctx.lineWidth = 2
-
-  const corners = [
-    [cx - offset, cy - offset,  1,  1],
-    [cx + offset, cy - offset, -1,  1],
-    [cx - offset, cy + offset,  1, -1],
-    [cx + offset, cy + offset, -1, -1],
-  ]
-  corners.forEach(([x, y, dx, dy]) => {
-    ctx.beginPath()
-    ctx.moveTo(x, y + dy * size * 0.3)
-    ctx.lineTo(x, y)
-    ctx.lineTo(x + dx * size * 0.3, y)
-    ctx.stroke()
-  })
-
-  ctx.beginPath()
-  ctx.arc(cx, cy, r + 4, 0, Math.PI * 2)
-  ctx.strokeStyle = `rgba(255, 221, 68, ${alpha * 0.45})`
-  ctx.lineWidth = 2
-  ctx.stroke()
-  ctx.restore()
-}
-
-// ------------------------------------------------------------------
-// COMPONENT
-// ------------------------------------------------------------------
 export default function AstroHit({ onBack }) {
+  const { user, openSignIn, submitGameScore, loadGameScores } = useAuth()
   const [phase, setPhase] = useState('menu')
   const [score, setScore] = useState(0)
-  const [bestScore, setBestScore] = useState(getHighScore())
+  const [bestScore, setBestScore] = useState(0)
+  const [guestScore, setGuestScore] = useState(() => getHighScore())
   const [maxCombo, setMaxCombo] = useState(0)
   const [lives, setLives] = useState(3)
   const [combo, setCombo] = useState(0)
   const canvasRef = useRef(null)
   const animRef = useRef(null)
+
+  useEffect(() => {
+    if (user) {
+      loadGameScores().then(scores => {
+        setBestScore(scores['astrohit']?.high_score || 0)
+      })
+    } else {
+      setBestScore(guestScore)
+    }
+  }, [user, guestScore, loadGameScores])
 
   useEffect(() => {
     const unlock = () => { getCtx(); window.removeEventListener('pointerdown', unlock); window.removeEventListener('keydown', unlock) }
@@ -365,17 +82,23 @@ export default function AstroHit({ onBack }) {
     setPhase('playing')
   }
 
-  const endGame = useCallback((finalScore, finalCombo) => {
+  const endGame = useCallback(async (finalScore, finalCombo) => {
     cancelAnimationFrame(animRef.current)
     SFX.over()
-    if (finalScore > getHighScore()) {
-      saveHighScore(finalScore)
-      setBestScore(finalScore)
+    if (user) {
+      const result = await submitGameScore('astrohit', finalScore)
+      if (result) setBestScore(result.high_score)
+    } else {
+      if (finalScore > guestScore) {
+        saveHighScore(finalScore)
+        setGuestScore(finalScore)
+        setBestScore(finalScore)
+      }
     }
     setScore(finalScore)
     setMaxCombo(finalCombo)
     setPhase('result')
-  }, [])
+  }, [user, submitGameScore, guestScore])
 
   useEffect(() => {
     if (phase !== 'playing') return
@@ -509,7 +232,6 @@ export default function AstroHit({ onBack }) {
       const color = hitType === 'perfect' ? '#ffdd44' : hitType === 'good' ? '#88ffcc' : '#aaccff'
       popups.push({ x: active.x, y: active.y - 20, text: `+${finalPoints}${comboMult > 1 ? ` ×${comboMult}` : ''}`, color, life: 70, big: hitType === 'perfect' })
 
-      // Spawn impact — the crater is created immediately with a growth animation
       const impSize = hitType === 'perfect' ? 22 : hitType === 'good' ? 15 : 10
       impacts.push({
         x: active.x,
@@ -522,7 +244,6 @@ export default function AstroHit({ onBack }) {
         seed: Math.random() * 1000,
       })
 
-      // Scatter particles too
       const pCount = hitType === 'perfect' ? 40 : hitType === 'good' ? 24 : 14
       const pColor = hitType === 'perfect' ? '#ffdd44' : hitType === 'good' ? '#88ffcc' : '#ffaa66'
       for (let i = 0; i < pCount; i++) {
@@ -617,12 +338,10 @@ export default function AstroHit({ onBack }) {
         ctx.fillRect((i * 173) % W(), (i * 267) % H(), 1.5, 1.5)
       }
 
-      // Baked moon base
       if (moonBaked) {
         ctx.drawImage(moonBaked, target.x - moonBakedCX, target.y - moonBakedCY)
       }
 
-      // Permanent craters from past impacts (drawn on top of baked base)
       ctx.save()
       ctx.beginPath()
       ctx.arc(target.x, target.y, target.r, 0, Math.PI * 2)
@@ -630,7 +349,6 @@ export default function AstroHit({ onBack }) {
       permanentCraters.forEach(c => {
         drawCrater(ctx, target.x + c.u * target.r, target.y + c.v * target.r, c.r * target.r, false)
       })
-      // Active impact craters (growing)
       impacts.forEach(imp => {
         const craterR = imp.size * Math.min(1, imp.age / 10) * 0.8
         if (craterR > 0.6) {
@@ -639,12 +357,10 @@ export default function AstroHit({ onBack }) {
       })
       ctx.restore()
 
-      // Impact effects — fireball, shockwave, ejecta, dust
       impacts.forEach(imp => drawImpactEffects(ctx, { x: target.x, y: target.y, r: target.r }, imp))
 
       if (inRange) drawLockOn(ctx, target.x, target.y, target.r, Date.now())
 
-      // Meteors
       meteors.forEach(m => {
         m.trail.forEach((t, i) => {
           const alpha = i / m.trail.length
@@ -733,7 +449,7 @@ export default function AstroHit({ onBack }) {
     <div style={s.root}>
       <button style={s.backBtn} onClick={onBack}>← Games</button>
       <div style={s.menuBox}>
-        <div style={{ width: '96px', height: '96px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,102,34,0.4) 0%, rgba(255,102,34,0.12) 50%, transparent 75%)', boxShadow: '0 0 60px rgba(255,102,34,0.3)' }} />
+        <div style={s.icon}>🌕</div>
         <h1 style={s.title}>Astro Hit</h1>
         <p style={s.subtitle}>Asteroids are falling toward the Moon. Tap before they slip past.</p>
         <div style={s.rulesBox}>
@@ -777,6 +493,250 @@ export default function AstroHit({ onBack }) {
       <button onClick={onBack} style={{ position: 'absolute', top: '64px', right: '16px', background: 'rgba(4,6,26,0.8)', border: '1px solid rgba(100,140,255,0.25)', color: 'rgba(180,200,255,0.7)', padding: '6px 12px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.75rem', fontFamily: 'Inter, sans-serif', zIndex: 10 }}>✕ Quit</button>
     </div>
   )
+}
+
+function hash(n) {
+  const x = Math.sin(n * 127.1 + 311.7) * 43758.5453
+  return x - Math.floor(x)
+}
+
+function genMoonTexture() {
+  const craters = []
+  const specks = []
+  const maria = []
+
+  const mariaGroups = [
+    { alpha: 0.40, circles: [{ dx: -0.28, dy: -0.18, r: 0.24 }, { dx: -0.18, dy: -0.08, r: 0.20 }, { dx: -0.34, dy: 0.02, r: 0.17 }] },
+    { alpha: 0.36, circles: [{ dx: 0.22, dy: -0.22, r: 0.19 }, { dx: 0.32, dy: -0.10, r: 0.15 }, { dx: 0.15, dy: -0.30, r: 0.13 }] },
+    { alpha: 0.34, circles: [{ dx: 0.12, dy: 0.30, r: 0.22 }, { dx: 0.26, dy: 0.22, r: 0.15 }] },
+    { alpha: 0.30, circles: [{ dx: -0.32, dy: 0.28, r: 0.13 }, { dx: -0.22, dy: 0.36, r: 0.11 }] },
+    { alpha: 0.28, circles: [{ dx: 0.36, dy: 0.30, r: 0.12 }] },
+  ]
+  mariaGroups.forEach(m => maria.push(m))
+
+  for (let i = 0; i < 42; i++) {
+    const ang = hash(i * 3 + 1) * Math.PI * 2
+    const dist = Math.sqrt(hash(i * 3 + 2)) * 0.93
+    const size = 0.012 + hash(i * 3 + 3) * 0.05
+    craters.push({ u: Math.cos(ang) * dist, v: Math.sin(ang) * dist, r: size })
+  }
+
+  for (let i = 0; i < 140; i++) {
+    const ang = hash(i + 5000) * Math.PI * 2
+    const dist = Math.sqrt(hash(i + 6000)) * 0.95
+    specks.push({
+      u: Math.cos(ang) * dist,
+      v: Math.sin(ang) * dist,
+      r: 0.004 + hash(i + 7000) * 0.011,
+      dark: hash(i + 8000) > 0.5,
+    })
+  }
+
+  return { craters, specks, maria }
+}
+
+const MOON_TEXTURE = genMoonTexture()
+
+function drawCrater(ctx, cx, cy, r, hot) {
+  if (r < 0.6) return
+  const lw = Math.max(1, r * 0.1)
+
+  ctx.beginPath()
+  ctx.arc(cx, cy, r * 0.85, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(28, 22, 16, 0.35)'
+  ctx.fill()
+
+  ctx.beginPath()
+  ctx.arc(cx - r * 0.22, cy - r * 0.22, r * 0.6, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(8, 6, 3, 0.38)'
+  ctx.fill()
+
+  ctx.beginPath()
+  ctx.arc(cx, cy, r * 0.92, Math.PI * 0.1, Math.PI * 0.9)
+  ctx.strokeStyle = 'rgba(252, 246, 232, 0.5)'
+  ctx.lineWidth = lw
+  ctx.stroke()
+
+  ctx.beginPath()
+  ctx.arc(cx, cy, r * 0.92, Math.PI * 1.15, Math.PI * 1.85)
+  ctx.strokeStyle = 'rgba(0, 0, 0, 0.28)'
+  ctx.lineWidth = lw
+  ctx.stroke()
+
+  if (hot) {
+    const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, r)
+    g.addColorStop(0, 'rgba(255, 170, 70, 0.45)')
+    g.addColorStop(1, 'rgba(255, 80, 20, 0)')
+    ctx.beginPath()
+    ctx.arc(cx, cy, r, 0, Math.PI * 2)
+    ctx.fillStyle = g
+    ctx.fill()
+  }
+}
+
+function bakeMoonBase(r) {
+  const pad = 30
+  const size = Math.ceil(r * 2 + pad * 2)
+  const c = document.createElement('canvas')
+  c.width = size
+  c.height = size
+  const bctx = c.getContext('2d')
+  const cx = size / 2
+  const cy = size / 2
+
+  const grad = bctx.createRadialGradient(cx - r * 0.42, cy - r * 0.42, r * 0.08, cx, cy, r)
+  grad.addColorStop(0,    '#f4f0e4')
+  grad.addColorStop(0.35, '#d8d2c2')
+  grad.addColorStop(0.7,  '#a29c8e')
+  grad.addColorStop(0.95, '#4a4236')
+  grad.addColorStop(1,    '#2a2418')
+  bctx.beginPath()
+  bctx.arc(cx, cy, r, 0, Math.PI * 2)
+  bctx.fillStyle = grad
+  bctx.fill()
+
+  bctx.save()
+  bctx.beginPath()
+  bctx.arc(cx, cy, r, 0, Math.PI * 2)
+  bctx.clip()
+
+  MOON_TEXTURE.maria.forEach(m => {
+    m.circles.forEach(circ => {
+      bctx.beginPath()
+      bctx.arc(cx + circ.dx * r, cy + circ.dy * r, circ.r * r, 0, Math.PI * 2)
+      bctx.fillStyle = `rgba(52, 46, 36, ${m.alpha})`
+      bctx.fill()
+    })
+  })
+
+  MOON_TEXTURE.craters.forEach(cr => {
+    drawCrater(bctx, cx + cr.u * r, cy + cr.v * r, cr.r * r, false)
+  })
+
+  MOON_TEXTURE.specks.forEach(sp => {
+    bctx.beginPath()
+    bctx.arc(cx + sp.u * r, cy + sp.v * r, sp.r * r, 0, Math.PI * 2)
+    bctx.fillStyle = sp.dark ? 'rgba(28, 22, 16, 0.4)' : 'rgba(248, 244, 232, 0.22)'
+    bctx.fill()
+  })
+
+  const limb = bctx.createRadialGradient(cx, cy, r * 0.6, cx, cy, r)
+  limb.addColorStop(0, 'rgba(0, 0, 0, 0)')
+  limb.addColorStop(1, 'rgba(0, 0, 0, 0.58)')
+  bctx.beginPath()
+  bctx.arc(cx, cy, r, 0, Math.PI * 2)
+  bctx.fillStyle = limb
+  bctx.fill()
+
+  bctx.restore()
+
+  bctx.beginPath()
+  bctx.arc(cx, cy, r - 0.6, -Math.PI * 0.78, Math.PI * 0.12)
+  bctx.strokeStyle = 'rgba(255, 252, 240, 0.55)'
+  bctx.lineWidth = 1.8
+  bctx.stroke()
+
+  return { canvas: c, cx, cy }
+}
+
+function drawImpactEffects(ctx, moon, imp) {
+  const px = moon.x + imp.u * moon.r
+  const py = moon.y + imp.v * moon.r
+  const craterR = imp.size * Math.min(1, imp.age / 10) * 0.8
+
+  if (imp.age < 15) {
+    const ft = imp.age / 15
+    const fr = imp.size * (1 + ft * 4.5)
+    const g = ctx.createRadialGradient(px, py, 0, px, py, fr)
+    g.addColorStop(0,    `rgba(255, 255, 255, ${1 - ft})`)
+    g.addColorStop(0.2,  `rgba(255, 245, 210, ${(1 - ft) * 0.9})`)
+    g.addColorStop(0.5,  `rgba(255, 180, 60,  ${(1 - ft) * 0.6})`)
+    g.addColorStop(0.8,  `rgba(255, 90,  25,  ${(1 - ft) * 0.3})`)
+    g.addColorStop(1,    'rgba(200, 40, 0, 0)')
+    ctx.beginPath()
+    ctx.arc(px, py, fr, 0, Math.PI * 2)
+    ctx.fillStyle = g
+    ctx.fill()
+  }
+
+  if (imp.age >= 1 && imp.age < 26) {
+    const st = (imp.age - 1) / 25
+    const sr = imp.size * (0.6 + st * 9)
+    const alpha = (1 - st) * 0.55
+    ctx.beginPath()
+    ctx.arc(px, py, sr, 0, Math.PI * 2)
+    ctx.strokeStyle = `rgba(255, 220, 160, ${alpha})`
+    ctx.lineWidth = 1.5 + st * 0.8
+    ctx.stroke()
+  }
+
+  if (imp.age >= 3 && imp.age < 30) {
+    const rt = (imp.age - 3) / 27
+    const alpha = (1 - rt) * 0.7
+    for (let i = 0; i < 16; i++) {
+      const jitter = Math.sin(i * 7.3 + imp.seed) * 0.18
+      const ang = (i / 16) * Math.PI * 2 + jitter
+      const rayLen = imp.size * (1 + rt * 5) * (0.55 + hash(i + imp.seed) * 0.9)
+      const x0 = px + Math.cos(ang) * craterR * 0.8
+      const y0 = py + Math.sin(ang) * craterR * 0.8
+      const x1 = px + Math.cos(ang) * rayLen
+      const y1 = py + Math.sin(ang) * rayLen
+      ctx.beginPath()
+      ctx.moveTo(x0, y0)
+      ctx.lineTo(x1, y1)
+      ctx.strokeStyle = `rgba(255, 225, 185, ${alpha})`
+      ctx.lineWidth = Math.max(0.4, 2 * (1 - rt))
+      ctx.stroke()
+    }
+  }
+
+  if (imp.age >= 5 && imp.age < 70) {
+    const pt = (imp.age - 5) / 65
+    const rise = pt * imp.size * 8
+    const alpha = (1 - pt) * 0.32
+    for (let i = 0; i < 8; i++) {
+      const jitter = Math.sin(i * 3.7 + imp.seed) * imp.size * 1.5
+      const puffY = py - rise * (0.3 + hash(i * 2 + imp.seed) * 1.0)
+      const puffR = imp.size * (0.6 + pt * 1.6) * (0.5 + hash(i * 5 + imp.seed) * 0.7)
+      ctx.beginPath()
+      ctx.arc(px + jitter * (0.3 + pt * 1.2), puffY, puffR, 0, Math.PI * 2)
+      ctx.fillStyle = `rgba(165, 145, 125, ${alpha * 0.55})`
+      ctx.fill()
+    }
+  }
+}
+
+function drawLockOn(ctx, cx, cy, r, t) {
+  const alpha = 0.6 + Math.sin(t * 0.012) * 0.3
+  const size = r * 0.35
+  const offset = r + 12
+
+  ctx.save()
+  ctx.shadowColor = 'rgba(255, 221, 68, 0.75)'
+  ctx.shadowBlur = 14
+  ctx.strokeStyle = `rgba(255, 221, 68, ${alpha})`
+  ctx.lineWidth = 2
+
+  const corners = [
+    [cx - offset, cy - offset,  1,  1],
+    [cx + offset, cy - offset, -1,  1],
+    [cx - offset, cy + offset,  1, -1],
+    [cx + offset, cy + offset, -1, -1],
+  ]
+  corners.forEach(([x, y, dx, dy]) => {
+    ctx.beginPath()
+    ctx.moveTo(x, y + dy * size * 0.3)
+    ctx.lineTo(x, y)
+    ctx.lineTo(x + dx * size * 0.3, y)
+    ctx.stroke()
+  })
+
+  ctx.beginPath()
+  ctx.arc(cx, cy, r + 4, 0, Math.PI * 2)
+  ctx.strokeStyle = `rgba(255, 221, 68, ${alpha * 0.45})`
+  ctx.lineWidth = 2
+  ctx.stroke()
+  ctx.restore()
 }
 
 const s = {

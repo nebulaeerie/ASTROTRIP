@@ -7,7 +7,9 @@ import { loadBrightStarCatalog } from './starData'
 import SkyView from './SkyView'
 import SatelliteOrbitView from './SatelliteOrbitView'
 import SearchBar from './SearchBar'
+import { AuthButton, AuthModal } from './Auth'
 import SpaceSound from './audio/SpaceSound'
+import { useAuth } from './Auth'
 
 
 const BODIES = [
@@ -557,17 +559,36 @@ export default function App() {
   const [showFavs, setShowFavs] = useState(false)
   const [orbitTarget, setOrbitTarget] = useState(null)
   const [ready, setReady] = useState(false)
-    const [favorites, setFavorites] = useState(() => {
-    try { return JSON.parse(localStorage.getItem('astroFavs') || '[]') } catch { return [] }
-  })
+   const { user, openSignIn, saveFavorite, removeFavorite, loadFavorites } = useAuth()
+const [favorites, setFavorites] = useState([])
 
-  const toggleFav = useCallback((name) => {
-    setFavorites(prev => {
-      const next = prev.includes(name) ? prev.filter(f => f !== name) : [...prev, name]
-      localStorage.setItem('astroFavs', JSON.stringify(next))
-      return next
-    })
-  }, [])
+useEffect(() => {
+  if (!user) { setFavorites([]); return }
+  loadFavorites().then(setFavorites)
+}, [user])
+
+ const toggleFav = async (name) => {
+  if (!user) { openSignIn(); return }
+  if (favorites.includes(name)) {
+    setFavorites(f => f.filter(x => x !== name))
+    await removeFavorite(name)
+  } else {
+    setFavorites(f => [...f, name])
+    await saveFavorite(name)
+    unlockAchievement('first_favorite')
+  }
+}
+
+useEffect(() => {
+  if (!user) return
+  const legacy = (() => {
+    try { return JSON.parse(localStorage.getItem('astroFavs') || '[]') } catch { return [] }
+  })()
+  if (legacy.length === 0) return
+  Promise.all(legacy.map(name => saveFavorite(name))).then(() => {
+    localStorage.removeItem('astroFavs')
+  })
+}, [user])
 
   function closePanel() {
     setSelected(null)
@@ -897,6 +918,7 @@ export default function App() {
           <button style={{ ...nb(showFavs), fontSize:'1rem', padding:'clamp(5px,1.5vw,7px) clamp(8px,2.5vw,12px)', display:'flex', alignItems:'center', gap:'5px' }} onClick={() => setShowFavs(v => !v)}>
             ★{favorites.length > 0 && <span style={{ background:'#5577ff', color:'#fff', borderRadius:'10px', fontSize:'0.68rem', padding:'1px 5px', fontWeight:600 }}>{favorites.length}</span>}
           </button>
+          <AuthButton />
         </nav>
       </header>
       )}
@@ -1049,7 +1071,9 @@ export default function App() {
         </div>
       )}
 
+      <AuthModal />
       <SpaceSound />
+
 
     </div>
   )

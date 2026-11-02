@@ -1,12 +1,11 @@
 import { useEffect, useState, useRef, useCallback } from 'react'
 import { supabase } from './supabaseClient'
+import { useAuth } from './Auth'
 
 const TOTAL_TIME = 60
 const QUESTIONS_PER_ROUND = 5
 
-function getHighScores() {
-  try { return JSON.parse(localStorage.getItem('astroBrainScores') || '[]') } catch { return [] }
-}
+function getHighScores() { try { return JSON.parse(localStorage.getItem('astroBrainScores') || '[]') } catch { return [] } }
 function saveHighScore(score) {
   const scores = getHighScores()
   scores.push({ score, date: new Date().toLocaleDateString() })
@@ -15,18 +14,18 @@ function saveHighScore(score) {
   localStorage.setItem('astroBrainScores', JSON.stringify(top10))
   return top10
 }
-
 function shuffle(arr) {
   const a = [...arr]
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]]
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
 }
 
 export default function AstroBrain({ onBack }) {
-  const [phase, setPhase] = useState('menu') // menu | loading | playing | result
+  const { user, submitGameScore, unlockAchievement } = useAuth()
+  const [phase, setPhase] = useState('menu')
   const [questions, setQuestions] = useState([])
   const [current, setCurrent] = useState(0)
   const [selected, setSelected] = useState(null)
@@ -39,12 +38,17 @@ export default function AstroBrain({ onBack }) {
   const timerRef = useRef(null)
   const scoreRef = useRef(0)
 
-  const endGame = useCallback((finalScore) => {
+  const endGame = useCallback(async (finalScore) => {
     clearInterval(timerRef.current)
-    const updated = saveHighScore(finalScore)
-    setHighScores(updated)
+    if (user) {
+      await submitGameScore('astrobrain', finalScore)
+      if (finalScore >= 500) unlockAchievement('brain_500')
+    } else {
+      const updated = saveHighScore(finalScore)
+      setHighScores(updated)
+    }
     setPhase('result')
-  }, [])
+  }, [user, submitGameScore, unlockAchievement])
 
   const startGame = async () => {
     setPhase('loading')
@@ -111,8 +115,7 @@ export default function AstroBrain({ onBack }) {
       <button style={s.backBtn} onClick={onBack}>← Games</button>
       <div style={s.menuBox}>
         <h1 style={s.gameTitle}>Astro Brain</h1>
-
-       <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(68,102,255,0.35) 0%, rgba(68,102,255,0.1) 50%, transparent 75%)', boxShadow: '0 0 40px rgba(68,102,255,0.25)', margin: '0 auto 14px' }} />
+        <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(68,102,255,0.35) 0%, rgba(68,102,255,0.1) 50%, transparent 75%)', boxShadow: '0 0 40px rgba(68,102,255,0.25)', margin: '0 auto 14px' }} />
         {error && <div style={s.error}>{error}</div>}
         <button style={s.startBtn} onClick={startGame}>Start Game</button>
         {highScores.length > 0 && (

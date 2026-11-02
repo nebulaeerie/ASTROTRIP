@@ -1,13 +1,16 @@
 import { useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
+import { useAuth } from './Auth'
 
 export default function CommentSection({ targetType, targetId, open, onClose }) {
+  const { user } = useAuth()
+  const displayName = user ? (user.user_metadata?.username || user.email.split('@')[0]) : ''
   const [comments, setComments] = useState([])
   const [loading, setLoading] = useState(true)
   const [author, setAuthor] = useState('')
   const [body, setBody] = useState('')
   const [submitting, setSubmitting] = useState(false)
-
+  
   useEffect(() => {
     if (!open) return
     let cancelled = false
@@ -31,15 +34,16 @@ export default function CommentSection({ targetType, targetId, open, onClose }) 
     if (!author.trim() || !body.trim() || submitting) return
     setSubmitting(true)
     const { data, error } = await supabase
-      .from('comments')
-      .insert({
-        target_type: targetType,
-        target_id: targetId,
-        author: author.trim().slice(0, 40),
-        body: body.trim().slice(0, 2000),
-      })
-      .select()
-      .single()
+  .from('comments')
+  .insert({
+    target_type: targetType,
+    target_id: targetId,
+    author: author.trim().slice(0, 40),
+    body: body.trim().slice(0, 2000),
+    user_id: user?.id || null,
+  })
+  .select()
+  .single()
     if (!error && data) {
       setComments(c => [...c, data])
       setBody('')
@@ -81,13 +85,19 @@ export default function CommentSection({ targetType, targetId, open, onClose }) 
       ))}
 
       <form onSubmit={submit} style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 8 }}>
-        <input
-          value={author}
-          onChange={e => setAuthor(e.target.value)}
-          placeholder="Your name"
-          maxLength={40}
-          style={inputStyle}
-        />
+               {user ? (
+          <div style={{ fontSize: '0.78rem', color: 'rgba(160,185,255,0.6)', padding: '4px 2px' }}>
+            Commenting as <span style={{ color: '#c8d8ff' }}>{displayName}</span>
+          </div>
+        ) : (
+          <input
+            value={author}
+            onChange={e => setAuthor(e.target.value)}
+            placeholder="Your name"
+            maxLength={40}
+            style={inputStyle}
+          />
+        )}
         <textarea
           value={body}
           onChange={e => setBody(e.target.value)}

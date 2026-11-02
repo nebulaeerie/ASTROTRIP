@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { useAuth } from './Auth'
 
 const PLANET_COLORS = ['#ffdd00','#909090','#ddaa44','#2277ff','#cc4400','#cc9966','#ddcc88','#88dddd','#3355ff']
 const PLANET_SIZES  = [26, 3, 5, 6, 4.5, 16, 14, 10, 9]
@@ -6,12 +7,6 @@ const PLANET_DIST   = [0, 80, 130, 180, 230, 300, 380, 450, 510]
 const PLANET_NAMES  = ['Sun','Mercury','Venus','Earth','Mars','Jupiter','Saturn','Uranus','Neptune']
 const STAR_COLORS   = ['#ffffff','#ffe8cc','#cce0ff','#ffeecc']
 
-// First-person mode uses a simple pseudo-3D pinhole-camera projection:
-// every object has a lateral position (lx, ly) and a depth (z, distance
-// ahead of the ship). Each frame z decreases (flying forward); screen
-// position and size scale with 1/z, which is what actually produces the
-// "flying toward it" feeling -- distant objects are small and barely
-// offset from center, close objects are huge and swing wide as you steer.
 const FOCAL = 340
 const MAX_Z = 2600
 const MIN_Z = 8
@@ -26,6 +21,8 @@ function getHighScore() { try { return parseInt(localStorage.getItem('astroDiveH
 function saveHighScore(s) { try { localStorage.setItem('astroDiveHS', String(s)) } catch {} }
 
 export default function AstroDive({ onBack }) {
+  const { user, submitGameScore, loadGameScores } = useAuth()
+
   const [phase, setPhase]       = useState('menu')
   const [mode, setMode]         = useState(null)
   const [score, setScore]       = useState(0)
@@ -36,12 +33,25 @@ export default function AstroDive({ onBack }) {
   const stateRef  = useRef({})
   const animRef   = useRef(null)
 
-  const endGame = useCallback((finalScore) => {
+  useEffect(() => {
+    if (!user) return
+    loadGameScores().then(scores => {
+      const dive = scores['astrodive']
+      if (dive?.high_score) setHighScore(prev => Math.max(prev, dive.high_score))
+    })
+  }, [user, loadGameScores])
+
+  const endGame = useCallback(async (finalScore) => {
     cancelAnimationFrame(animRef.current)
-    if (finalScore > getHighScore()) { saveHighScore(finalScore); setHighScore(finalScore) }
+    if (user) {
+      const result = await submitGameScore('astrodive', finalScore)
+      if (result) setHighScore(result.high_score)
+    } else {
+      if (finalScore > getHighScore()) { saveHighScore(finalScore); setHighScore(finalScore) }
+    }
     setScore(finalScore)
     setPhase('result')
-  }, [])
+  }, [user, submitGameScore])
 
   useEffect(() => {
     if (phase !== 'playing') return
@@ -56,7 +66,6 @@ export default function AstroDive({ onBack }) {
     function onKey(e) { keys[e.code] = e.type === 'keydown'; e.preventDefault() }
 
     if (mode === 'topdown') {
-      // ---------------- TOP-DOWN MODE (unchanged: free-roam map view) ----------------
       const stars = Array.from({ length: W < 700 ? 120 : 300 }, () => ({
         x: Math.random() * W * 4 - W * 1.5,
         y: Math.random() * H * 4 - H * 1.5,
@@ -198,7 +207,6 @@ export default function AstroDive({ onBack }) {
       }
     }
 
-    // ---------------- FIRST-PERSON MODE: real pseudo-3D flight through space ----------------
     const ship = { lx: 0, ly: 0, invincible: 0 }
     let planetCursor = 0
     function spawnPlanet(z) {
@@ -365,7 +373,7 @@ export default function AstroDive({ onBack }) {
     <div style={s.root}>
       <button style={s.backBtn} onClick={onBack}>← Games</button>
       <div style={s.menuBox}>
-       <div style={{ width: '96px', height: '96px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(204,68,255,0.4) 0%, rgba(204,68,255,0.12) 50%, transparent 75%)', boxShadow: '0 0 60px rgba(204,68,255,0.3)' }} />
+        <div style={{ width: '96px', height: '96px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(204,68,255,0.4) 0%, rgba(204,68,255,0.12) 50%, transparent 75%)', boxShadow: '0 0 60px rgba(204,68,255,0.3)' }} />
         <h1 style={s.title}>Astro Dive</h1>
         <p style={s.subtitle}>Collect stars. Avoid asteroids and planet collisions.</p>
         <p style={s.subtitle}>Choose your perspective:</p>

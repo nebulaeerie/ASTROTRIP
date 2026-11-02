@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useAuth } from './Auth'
 
 const PLANETS = [
   {
@@ -92,7 +93,12 @@ const PLANETS = [
 ]
 
 function shuffle(arr) {
-  const a = [...arr]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1));[a[i], a[j]] = [a[j], a[i]] } return a
+  const a = [...arr]
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[a[i], a[j]] = [a[j], a[i]]
+  }
+  return a
 }
 
 function getHighScores() {
@@ -108,6 +114,8 @@ function saveHighScore(score) {
 }
 
 export default function AstroGuess({ onBack }) {
+  const { user, submitGameScore } = useAuth()
+
   const [phase, setPhase] = useState('menu')
   const [planets, setPlanets] = useState([])
   const [current, setCurrent] = useState(0)
@@ -159,8 +167,12 @@ export default function AstroGuess({ onBack }) {
 
   function handleNext() {
     if (current + 1 >= planets.length) {
-      const updated = saveHighScore(score)
-      setHighScores(updated)
+      if (user) {
+        submitGameScore('astroguess', score)
+      } else {
+        const updated = saveHighScore(score)
+        setHighScores(updated)
+      }
       setPhase('result')
     } else {
       const next = current + 1
@@ -177,7 +189,7 @@ export default function AstroGuess({ onBack }) {
     <div style={s.root}>
       <button style={s.backBtn} onClick={onBack}>← Games</button>
       <div style={s.menuBox}>
-       <div style={{ width: '96px', height: '96px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,204,68,0.4) 0%, rgba(255,204,68,0.12) 50%, transparent 75%)', boxShadow: '0 0 60px rgba(255,204,68,0.3)' }} />
+        <div style={{ width: '96px', height: '96px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,204,68,0.4) 0%, rgba(255,204,68,0.12) 50%, transparent 75%)', boxShadow: '0 0 60px rgba(255,204,68,0.3)' }} />
         <h1 style={s.title}>Astro Guess</h1>
         <p style={s.subtitle}>Read the clues one by one. The fewer clues you need, the more points you earn.</p>
         <div style={s.pointsGuide}>
