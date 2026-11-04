@@ -182,7 +182,7 @@ const s = {
   topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '20px 40px', background: 'rgba(2,3,15,0.92)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(80,110,200,0.12)', position: 'sticky', top: 0, zIndex: 10 },
   backBtn: { background: 'transparent', border: '1px solid rgba(100,140,255,0.25)', color: 'rgba(180,200,255,0.7)', padding: '8px 16px', borderRadius: '8px', cursor: 'pointer', fontSize: '0.82rem', fontFamily: 'inherit' },
   pageTitle: { color: '#fff', fontSize: '1.2rem', fontFamily: 'Georgia, serif', fontWeight: 300, letterSpacing: '0.15em', margin: 0 },
-  layout: { display: 'grid', gridTemplateColumns: '380px 1fr', gap: '0', flex: 1 },
+  layout: { display: 'grid', gridTemplateColumns: window.innerWidth < 768 ? '1fr' : '380px 1fr', gap: '0', flex: 1 },
   leftPanel: { padding: '28px 24px', borderRight: '1px solid rgba(80,110,200,0.12)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '16px' },
   sectionLabel: { color: 'rgba(120,160,255,0.5)', fontSize: '0.7rem', letterSpacing: '0.18em', textTransform: 'uppercase', marginBottom: '4px' },
   sliderRow: { display: 'flex', flexDirection: 'column', gap: '6px', background: 'rgba(8,12,40,0.5)', borderRadius: '10px', padding: '12px 14px', border: '1px solid rgba(80,110,200,0.1)' },

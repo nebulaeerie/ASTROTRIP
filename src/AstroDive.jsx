@@ -57,9 +57,16 @@ export default function AstroDive({ onBack }) {
     if (phase !== 'playing') return
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
-    canvas.width  = canvas.offsetWidth
-    canvas.height = canvas.offsetHeight
-    const W = canvas.width, H = canvas.height
+    const isMobile = window.innerWidth < 768
+const dpr = Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2)
+const cssW = canvas.offsetWidth
+const cssH = canvas.offsetHeight
+canvas.width = Math.floor(cssW * dpr)
+canvas.height = Math.floor(cssH * dpr)
+canvas.style.width = cssW + 'px'
+canvas.style.height = cssH + 'px'
+ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
+const W = cssW, H = cssH
     const keys = {}
     let scoreVal = 0, livesVal = 3, gameOver = false
 

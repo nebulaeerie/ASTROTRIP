@@ -1,204 +1,104 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 import { supabase } from './supabaseClient'
-import ReactCountryFlag from 'react-country-flag'
-
-const AuthContext = createContext(null)
 
 const COUNTRIES = [
-  { n: 'Afghanistan', d: '+93', code: 'AF' },
-  { n: 'Albania', d: '+355', code: 'AL' },
-  { n: 'Algeria', d: '+213', code: 'DZ' },
-  { n: 'Andorra', d: '+376', code: 'AD' },
-  { n: 'Angola', d: '+244', code: 'AO' },
-  { n: 'Antigua and Barbuda', d: '+1268', code: 'AG' },
-  { n: 'Argentina', d: '+54', code: 'AR' },
-  { n: 'Armenia', d: '+374', code: 'AM' },
-  { n: 'Australia', d: '+61', code: 'AU' },
-  { n: 'Austria', d: '+43', code: 'AT' },
-  { n: 'Azerbaijan', d: '+994', code: 'AZ' },
-  { n: 'Bahamas', d: '+1242', code: 'BS' },
-  { n: 'Bahrain', d: '+973', code: 'BH' },
-  { n: 'Bangladesh', d: '+880', code: 'BD' },
-  { n: 'Barbados', d: '+1246', code: 'BB' },
-  { n: 'Belarus', d: '+375', code: 'BY' },
-  { n: 'Belgium', d: '+32', code: 'BE' },
-  { n: 'Belize', d: '+501', code: 'BZ' },
-  { n: 'Benin', d: '+229', code: 'BJ' },
-  { n: 'Bhutan', d: '+975', code: 'BT' },
-  { n: 'Bolivia', d: '+591', code: 'BO' },
-  { n: 'Bosnia and Herzegovina', d: '+387', code: 'BA' },
-  { n: 'Botswana', d: '+267', code: 'BW' },
-  { n: 'Brazil', d: '+55', code: 'BR' },
-  { n: 'Brunei', d: '+673', code: 'BN' },
-  { n: 'Bulgaria', d: '+359', code: 'BG' },
-  { n: 'Burkina Faso', d: '+226', code: 'BF' },
-  { n: 'Burundi', d: '+257', code: 'BI' },
-  { n: 'Cambodia', d: '+855', code: 'KH' },
-  { n: 'Cameroon', d: '+237', code: 'CM' },
-  { n: 'Canada', d: '+1', code: 'CA' },
-  { n: 'Cape Verde', d: '+238', code: 'CV' },
-  { n: 'Central African Republic', d: '+236', code: 'CF' },
-  { n: 'Chad', d: '+235', code: 'TD' },
-  { n: 'Chile', d: '+56', code: 'CL' },
-  { n: 'China', d: '+86', code: 'CN' },
-  { n: 'Colombia', d: '+57', code: 'CO' },
-  { n: 'Comoros', d: '+269', code: 'KM' },
-  { n: 'Congo', d: '+242', code: 'CG' },
-  { n: 'Congo (DRC)', d: '+243', code: 'CD' },
-  { n: 'Costa Rica', d: '+506', code: 'CR' },
-  { n: 'Croatia', d: '+385', code: 'HR' },
-  { n: 'Cuba', d: '+53', code: 'CU' },
-  { n: 'Cyprus', d: '+357', code: 'CY' },
-  { n: 'Czechia', d: '+420', code: 'CZ' },
-  { n: 'Denmark', d: '+45', code: 'DK' },
-  { n: 'Djibouti', d: '+253', code: 'DJ' },
-  { n: 'Dominica', d: '+1767', code: 'DM' },
-  { n: 'Dominican Republic', d: '+1', code: 'DO' },
-  { n: 'Ecuador', d: '+593', code: 'EC' },
-  { n: 'Egypt', d: '+20', code: 'EG' },
-  { n: 'El Salvador', d: '+503', code: 'SV' },
-  { n: 'Equatorial Guinea', d: '+240', code: 'GQ' },
-  { n: 'Eritrea', d: '+291', code: 'ER' },
-  { n: 'Estonia', d: '+372', code: 'EE' },
-  { n: 'Eswatini', d: '+268', code: 'SZ' },
-  { n: 'Ethiopia', d: '+251', code: 'ET' },
-  { n: 'Fiji', d: '+679', code: 'FJ' },
-  { n: 'Finland', d: '+358', code: 'FI' },
-  { n: 'France', d: '+33', code: 'FR' },
-  { n: 'Gabon', d: '+241', code: 'GA' },
-  { n: 'Gambia', d: '+220', code: 'GM' },
-  { n: 'Georgia', d: '+995', code: 'GE' },
-  { n: 'Germany', d: '+49', code: 'DE' },
-  { n: 'Ghana', d: '+233', code: 'GH' },
-  { n: 'Greece', d: '+30', code: 'GR' },
-  { n: 'Grenada', d: '+1473', code: 'GD' },
-  { n: 'Guatemala', d: '+502', code: 'GT' },
-  { n: 'Guinea', d: '+224', code: 'GN' },
-  { n: 'Guinea-Bissau', d: '+245', code: 'GW' },
-  { n: 'Guyana', d: '+592', code: 'GY' },
-  { n: 'Haiti', d: '+509', code: 'HT' },
-  { n: 'Honduras', d: '+504', code: 'HN' },
-  { n: 'Hungary', d: '+36', code: 'HU' },
-  { n: 'Iceland', d: '+354', code: 'IS' },
-  { n: 'India', d: '+91', code: 'IN' },
-  { n: 'Indonesia', d: '+62', code: 'ID' },
-  { n: 'Iran', d: '+98', code: 'IR' },
-  { n: 'Iraq', d: '+964', code: 'IQ' },
-  { n: 'Ireland', d: '+353', code: 'IE' },
-  { n: 'Israel', d: '+972', code: 'IL' },
-  { n: 'Italy', d: '+39', code: 'IT' },
-  { n: 'Jamaica', d: '+1876', code: 'JM' },
-  { n: 'Japan', d: '+81', code: 'JP' },
-  { n: 'Jordan', d: '+962', code: 'JO' },
-  { n: 'Kazakhstan', d: '+7', code: 'KZ' },
-  { n: 'Kenya', d: '+254', code: 'KE' },
-  { n: 'Kiribati', d: '+686', code: 'KI' },
-  { n: 'Kuwait', d: '+965', code: 'KW' },
-  { n: 'Kyrgyzstan', d: '+996', code: 'KG' },
-  { n: 'Laos', d: '+856', code: 'LA' },
-  { n: 'Latvia', d: '+371', code: 'LV' },
-  { n: 'Lebanon', d: '+961', code: 'LB' },
-  { n: 'Lesotho', d: '+266', code: 'LS' },
-  { n: 'Liberia', d: '+231', code: 'LR' },
-  { n: 'Libya', d: '+218', code: 'LY' },
-  { n: 'Liechtenstein', d: '+423', code: 'LI' },
-  { n: 'Lithuania', d: '+370', code: 'LT' },
-  { n: 'Luxembourg', d: '+352', code: 'LU' },
-  { n: 'Madagascar', d: '+261', code: 'MG' },
-  { n: 'Malawi', d: '+265', code: 'MW' },
-  { n: 'Malaysia', d: '+60', code: 'MY' },
-  { n: 'Maldives', d: '+960', code: 'MV' },
-  { n: 'Mali', d: '+223', code: 'ML' },
-  { n: 'Malta', d: '+356', code: 'MT' },
-  { n: 'Marshall Islands', d: '+692', code: 'MH' },
-  { n: 'Mauritania', d: '+222', code: 'MR' },
-  { n: 'Mauritius', d: '+230', code: 'MU' },
-  { n: 'Mexico', d: '+52', code: 'MX' },
-  { n: 'Micronesia', d: '+691', code: 'FM' },
-  { n: 'Moldova', d: '+373', code: 'MD' },
-  { n: 'Monaco', d: '+377', code: 'MC' },
-  { n: 'Mongolia', d: '+976', code: 'MN' },
-  { n: 'Montenegro', d: '+382', code: 'ME' },
-  { n: 'Morocco', d: '+212', code: 'MA' },
-  { n: 'Mozambique', d: '+258', code: 'MZ' },
-  { n: 'Myanmar', d: '+95', code: 'MM' },
-  { n: 'Namibia', d: '+264', code: 'NA' },
-  { n: 'Nauru', d: '+674', code: 'NR' },
-  { n: 'Nepal', d: '+977', code: 'NP' },
-  { n: 'Netherlands', d: '+31', code: 'NL' },
-  { n: 'New Zealand', d: '+64', code: 'NZ' },
-  { n: 'Nicaragua', d: '+505', code: 'NI' },
-  { n: 'Niger', d: '+227', code: 'NE' },
-  { n: 'Nigeria', d: '+234', code: 'NG' },
-  { n: 'North Korea', d: '+850', code: 'KP' },
-  { n: 'North Macedonia', d: '+389', code: 'MK' },
-  { n: 'Norway', d: '+47', code: 'NO' },
-  { n: 'Oman', d: '+968', code: 'OM' },
-  { n: 'Pakistan', d: '+92', code: 'PK' },
-  { n: 'Palau', d: '+680', code: 'PW' },
-  { n: 'Palestine', d: '+970', code: 'PS' },
-  { n: 'Panama', d: '+507', code: 'PA' },
-  { n: 'Papua New Guinea', d: '+675', code: 'PG' },
-  { n: 'Paraguay', d: '+595', code: 'PY' },
-  { n: 'Peru', d: '+51', code: 'PE' },
-  { n: 'Philippines', d: '+63', code: 'PH' },
-  { n: 'Poland', d: '+48', code: 'PL' },
-  { n: 'Portugal', d: '+351', code: 'PT' },
-  { n: 'Qatar', d: '+974', code: 'QA' },
-  { n: 'Romania', d: '+40', code: 'RO' },
-  { n: 'Russia', d: '+7', code: 'RU' },
-  { n: 'Rwanda', d: '+250', code: 'RW' },
-  { n: 'Saint Kitts and Nevis', d: '+1869', code: 'KN' },
-  { n: 'Saint Lucia', d: '+1758', code: 'LC' },
-  { n: 'Saint Vincent and the Grenadines', d: '+1784', code: 'VC' },
-  { n: 'Samoa', d: '+685', code: 'WS' },
-  { n: 'San Marino', d: '+378', code: 'SM' },
-  { n: 'Sao Tome and Principe', d: '+239', code: 'ST' },
-  { n: 'Saudi Arabia', d: '+966', code: 'SA' },
-  { n: 'Senegal', d: '+221', code: 'SN' },
-  { n: 'Serbia', d: '+381', code: 'RS' },
-  { n: 'Seychelles', d: '+248', code: 'SC' },
-  { n: 'Sierra Leone', d: '+232', code: 'SL' },
-  { n: 'Singapore', d: '+65', code: 'SG' },
-  { n: 'Slovakia', d: '+421', code: 'SK' },
-  { n: 'Slovenia', d: '+386', code: 'SI' },
-  { n: 'Solomon Islands', d: '+677', code: 'SB' },
-  { n: 'Somalia', d: '+252', code: 'SO' },
-  { n: 'South Africa', d: '+27', code: 'ZA' },
-  { n: 'South Korea', d: '+82', code: 'KR' },
-  { n: 'South Sudan', d: '+211', code: 'SS' },
-  { n: 'Spain', d: '+34', code: 'ES' },
-  { n: 'Sri Lanka', d: '+94', code: 'LK' },
-  { n: 'Sudan', d: '+249', code: 'SD' },
-  { n: 'Suriname', d: '+597', code: 'SR' },
-  { n: 'Sweden', d: '+46', code: 'SE' },
-  { n: 'Switzerland', d: '+41', code: 'CH' },
-  { n: 'Syria', d: '+963', code: 'SY' },
-  { n: 'Taiwan', d: '+886', code: 'TW' },
-  { n: 'Tajikistan', d: '+992', code: 'TJ' },
-  { n: 'Tanzania', d: '+255', code: 'TZ' },
-  { n: 'Thailand', d: '+66', code: 'TH' },
-  { n: 'Timor-Leste', d: '+670', code: 'TL' },
-  { n: 'Togo', d: '+228', code: 'TG' },
-  { n: 'Tonga', d: '+676', code: 'TO' },
-  { n: 'Trinidad and Tobago', d: '+1868', code: 'TT' },
-  { n: 'Tunisia', d: '+216', code: 'TN' },
-  { n: 'Turkey', d: '+90', code: 'TR' },
-  { n: 'Turkmenistan', d: '+993', code: 'TM' },
-  { n: 'Tuvalu', d: '+688', code: 'TV' },
-  { n: 'Uganda', d: '+256', code: 'UG' },
-  { n: 'Ukraine', d: '+380', code: 'UA' },
-  { n: 'United Arab Emirates', d: '+971', code: 'AE' },
-  { n: 'United Kingdom', d: '+44', code: 'GB' },
-  { n: 'United States', d: '+1', code: 'US' },
-  { n: 'Uruguay', d: '+598', code: 'UY' },
-  { n: 'Uzbekistan', d: '+998', code: 'UZ' },
-  { n: 'Vanuatu', d: '+678', code: 'VU' },
-  { n: 'Vatican City', d: '+379', code: 'VA' },
-  { n: 'Venezuela', d: '+58', code: 'VE' },
-  { n: 'Vietnam', d: '+84', code: 'VN' },
-  { n: 'Yemen', d: '+967', code: 'YE' },
-  { n: 'Zambia', d: '+260', code: 'ZM' },
+  { n: 'Afghanistan', d: '+93', code: 'AF' }, { n: 'Albania', d: '+355', code: 'AL' },
+  { n: 'Algeria', d: '+213', code: 'DZ' }, { n: 'Andorra', d: '+376', code: 'AD' },
+  { n: 'Angola', d: '+244', code: 'AO' }, { n: 'Antigua and Barbuda', d: '+1268', code: 'AG' },
+  { n: 'Argentina', d: '+54', code: 'AR' }, { n: 'Armenia', d: '+374', code: 'AM' },
+  { n: 'Australia', d: '+61', code: 'AU' }, { n: 'Austria', d: '+43', code: 'AT' },
+  { n: 'Azerbaijan', d: '+994', code: 'AZ' }, { n: 'Bahamas', d: '+1242', code: 'BS' },
+  { n: 'Bahrain', d: '+973', code: 'BH' }, { n: 'Bangladesh', d: '+880', code: 'BD' },
+  { n: 'Barbados', d: '+1246', code: 'BB' }, { n: 'Belarus', d: '+375', code: 'BY' },
+  { n: 'Belgium', d: '+32', code: 'BE' }, { n: 'Belize', d: '+501', code: 'BZ' },
+  { n: 'Benin', d: '+229', code: 'BJ' }, { n: 'Bhutan', d: '+975', code: 'BT' },
+  { n: 'Bolivia', d: '+591', code: 'BO' }, { n: 'Bosnia and Herzegovina', d: '+387', code: 'BA' },
+  { n: 'Botswana', d: '+267', code: 'BW' }, { n: 'Brazil', d: '+55', code: 'BR' },
+  { n: 'Brunei', d: '+673', code: 'BN' }, { n: 'Bulgaria', d: '+359', code: 'BG' },
+  { n: 'Burkina Faso', d: '+226', code: 'BF' }, { n: 'Burundi', d: '+257', code: 'BI' },
+  { n: 'Cambodia', d: '+855', code: 'KH' }, { n: 'Cameroon', d: '+237', code: 'CM' },
+  { n: 'Canada', d: '+1', code: 'CA' }, { n: 'Cape Verde', d: '+238', code: 'CV' },
+  { n: 'Central African Republic', d: '+236', code: 'CF' }, { n: 'Chad', d: '+235', code: 'TD' },
+  { n: 'Chile', d: '+56', code: 'CL' }, { n: 'China', d: '+86', code: 'CN' },
+  { n: 'Colombia', d: '+57', code: 'CO' }, { n: 'Comoros', d: '+269', code: 'KM' },
+  { n: 'Congo', d: '+242', code: 'CG' }, { n: 'Congo (DRC)', d: '+243', code: 'CD' },
+  { n: 'Costa Rica', d: '+506', code: 'CR' }, { n: 'Croatia', d: '+385', code: 'HR' },
+  { n: 'Cuba', d: '+53', code: 'CU' }, { n: 'Cyprus', d: '+357', code: 'CY' },
+  { n: 'Czechia', d: '+420', code: 'CZ' }, { n: 'Denmark', d: '+45', code: 'DK' },
+  { n: 'Djibouti', d: '+253', code: 'DJ' }, { n: 'Dominica', d: '+1767', code: 'DM' },
+  { n: 'Dominican Republic', d: '+1', code: 'DO' }, { n: 'Ecuador', d: '+593', code: 'EC' },
+  { n: 'Egypt', d: '+20', code: 'EG' }, { n: 'El Salvador', d: '+503', code: 'SV' },
+  { n: 'Equatorial Guinea', d: '+240', code: 'GQ' }, { n: 'Eritrea', d: '+291', code: 'ER' },
+  { n: 'Estonia', d: '+372', code: 'EE' }, { n: 'Eswatini', d: '+268', code: 'SZ' },
+  { n: 'Ethiopia', d: '+251', code: 'ET' }, { n: 'Fiji', d: '+679', code: 'FJ' },
+  { n: 'Finland', d: '+358', code: 'FI' }, { n: 'France', d: '+33', code: 'FR' },
+  { n: 'Gabon', d: '+241', code: 'GA' }, { n: 'Gambia', d: '+220', code: 'GM' },
+  { n: 'Georgia', d: '+995', code: 'GE' }, { n: 'Germany', d: '+49', code: 'DE' },
+  { n: 'Ghana', d: '+233', code: 'GH' }, { n: 'Greece', d: '+30', code: 'GR' },
+  { n: 'Grenada', d: '+1473', code: 'GD' }, { n: 'Guatemala', d: '+502', code: 'GT' },
+  { n: 'Guinea', d: '+224', code: 'GN' }, { n: 'Guinea-Bissau', d: '+245', code: 'GW' },
+  { n: 'Guyana', d: '+592', code: 'GY' }, { n: 'Haiti', d: '+509', code: 'HT' },
+  { n: 'Honduras', d: '+504', code: 'HN' }, { n: 'Hungary', d: '+36', code: 'HU' },
+  { n: 'Iceland', d: '+354', code: 'IS' }, { n: 'India', d: '+91', code: 'IN' },
+  { n: 'Indonesia', d: '+62', code: 'ID' }, { n: 'Iran', d: '+98', code: 'IR' },
+  { n: 'Iraq', d: '+964', code: 'IQ' }, { n: 'Ireland', d: '+353', code: 'IE' },
+  { n: 'Israel', d: '+972', code: 'IL' }, { n: 'Italy', d: '+39', code: 'IT' },
+  { n: 'Jamaica', d: '+1876', code: 'JM' }, { n: 'Japan', d: '+81', code: 'JP' },
+  { n: 'Jordan', d: '+962', code: 'JO' }, { n: 'Kazakhstan', d: '+7', code: 'KZ' },
+  { n: 'Kenya', d: '+254', code: 'KE' }, { n: 'Kiribati', d: '+686', code: 'KI' },
+  { n: 'Kuwait', d: '+965', code: 'KW' }, { n: 'Kyrgyzstan', d: '+996', code: 'KG' },
+  { n: 'Laos', d: '+856', code: 'LA' }, { n: 'Latvia', d: '+371', code: 'LV' },
+  { n: 'Lebanon', d: '+961', code: 'LB' }, { n: 'Lesotho', d: '+266', code: 'LS' },
+  { n: 'Liberia', d: '+231', code: 'LR' }, { n: 'Libya', d: '+218', code: 'LY' },
+  { n: 'Liechtenstein', d: '+423', code: 'LI' }, { n: 'Lithuania', d: '+370', code: 'LT' },
+  { n: 'Luxembourg', d: '+352', code: 'LU' }, { n: 'Madagascar', d: '+261', code: 'MG' },
+  { n: 'Malawi', d: '+265', code: 'MW' }, { n: 'Malaysia', d: '+60', code: 'MY' },
+  { n: 'Maldives', d: '+960', code: 'MV' }, { n: 'Mali', d: '+223', code: 'ML' },
+  { n: 'Malta', d: '+356', code: 'MT' }, { n: 'Marshall Islands', d: '+692', code: 'MH' },
+  { n: 'Mauritania', d: '+222', code: 'MR' }, { n: 'Mauritius', d: '+230', code: 'MU' },
+  { n: 'Mexico', d: '+52', code: 'MX' }, { n: 'Micronesia', d: '+691', code: 'FM' },
+  { n: 'Moldova', d: '+373', code: 'MD' }, { n: 'Monaco', d: '+377', code: 'MC' },
+  { n: 'Mongolia', d: '+976', code: 'MN' }, { n: 'Montenegro', d: '+382', code: 'ME' },
+  { n: 'Morocco', d: '+212', code: 'MA' }, { n: 'Mozambique', d: '+258', code: 'MZ' },
+  { n: 'Myanmar', d: '+95', code: 'MM' }, { n: 'Namibia', d: '+264', code: 'NA' },
+  { n: 'Nauru', d: '+674', code: 'NR' }, { n: 'Nepal', d: '+977', code: 'NP' },
+  { n: 'Netherlands', d: '+31', code: 'NL' }, { n: 'New Zealand', d: '+64', code: 'NZ' },
+  { n: 'Nicaragua', d: '+505', code: 'NI' }, { n: 'Niger', d: '+227', code: 'NE' },
+  { n: 'Nigeria', d: '+234', code: 'NG' }, { n: 'North Korea', d: '+850', code: 'KP' },
+  { n: 'North Macedonia', d: '+389', code: 'MK' }, { n: 'Norway', d: '+47', code: 'NO' },
+  { n: 'Oman', d: '+968', code: 'OM' }, { n: 'Pakistan', d: '+92', code: 'PK' },
+  { n: 'Palau', d: '+680', code: 'PW' }, { n: 'Palestine', d: '+970', code: 'PS' },
+  { n: 'Panama', d: '+507', code: 'PA' }, { n: 'Papua New Guinea', d: '+675', code: 'PG' },
+  { n: 'Paraguay', d: '+595', code: 'PY' }, { n: 'Peru', d: '+51', code: 'PE' },
+  { n: 'Philippines', d: '+63', code: 'PH' }, { n: 'Poland', d: '+48', code: 'PL' },
+  { n: 'Portugal', d: '+351', code: 'PT' }, { n: 'Qatar', d: '+974', code: 'QA' },
+  { n: 'Romania', d: '+40', code: 'RO' }, { n: 'Russia', d: '+7', code: 'RU' },
+  { n: 'Rwanda', d: '+250', code: 'RW' }, { n: 'Saint Kitts and Nevis', d: '+1869', code: 'KN' },
+  { n: 'Saint Lucia', d: '+1758', code: 'LC' }, { n: 'Saint Vincent and the Grenadines', d: '+1784', code: 'VC' },
+  { n: 'Samoa', d: '+685', code: 'WS' }, { n: 'San Marino', d: '+378', code: 'SM' },
+  { n: 'Sao Tome and Principe', d: '+239', code: 'ST' }, { n: 'Saudi Arabia', d: '+966', code: 'SA' },
+  { n: 'Senegal', d: '+221', code: 'SN' }, { n: 'Serbia', d: '+381', code: 'RS' },
+  { n: 'Seychelles', d: '+248', code: 'SC' }, { n: 'Sierra Leone', d: '+232', code: 'SL' },
+  { n: 'Singapore', d: '+65', code: 'SG' }, { n: 'Slovakia', d: '+421', code: 'SK' },
+  { n: 'Slovenia', d: '+386', code: 'SI' }, { n: 'Solomon Islands', d: '+677', code: 'SB' },
+  { n: 'Somalia', d: '+252', code: 'SO' }, { n: 'South Africa', d: '+27', code: 'ZA' },
+  { n: 'South Korea', d: '+82', code: 'KR' }, { n: 'South Sudan', d: '+211', code: 'SS' },
+  { n: 'Spain', d: '+34', code: 'ES' }, { n: 'Sri Lanka', d: '+94', code: 'LK' },
+  { n: 'Sudan', d: '+249', code: 'SD' }, { n: 'Suriname', d: '+597', code: 'SR' },
+  { n: 'Sweden', d: '+46', code: 'SE' }, { n: 'Switzerland', d: '+41', code: 'CH' },
+  { n: 'Syria', d: '+963', code: 'SY' }, { n: 'Taiwan', d: '+886', code: 'TW' },
+  { n: 'Tajikistan', d: '+992', code: 'TJ' }, { n: 'Tanzania', d: '+255', code: 'TZ' },
+  { n: 'Thailand', d: '+66', code: 'TH' }, { n: 'Timor-Leste', d: '+670', code: 'TL' },
+  { n: 'Togo', d: '+228', code: 'TG' }, { n: 'Tonga', d: '+676', code: 'TO' },
+  { n: 'Trinidad and Tobago', d: '+1868', code: 'TT' }, { n: 'Tunisia', d: '+216', code: 'TN' },
+  { n: 'Turkey', d: '+90', code: 'TR' }, { n: 'Turkmenistan', d: '+993', code: 'TM' },
+  { n: 'Tuvalu', d: '+688', code: 'TV' }, { n: 'Uganda', d: '+256', code: 'UG' },
+  { n: 'Ukraine', d: '+380', code: 'UA' }, { n: 'United Arab Emirates', d: '+971', code: 'AE' },
+  { n: 'United Kingdom', d: '+44', code: 'GB' }, { n: 'United States', d: '+1', code: 'US' },
+  { n: 'Uruguay', d: '+598', code: 'UY' }, { n: 'Uzbekistan', d: '+998', code: 'UZ' },
+  { n: 'Vanuatu', d: '+678', code: 'VU' }, { n: 'Vatican City', d: '+379', code: 'VA' },
+  { n: 'Venezuela', d: '+58', code: 'VE' }, { n: 'Vietnam', d: '+84', code: 'VN' },
+  { n: 'Yemen', d: '+967', code: 'YE' }, { n: 'Zambia', d: '+260', code: 'ZM' },
   { n: 'Zimbabwe', d: '+263', code: 'ZW' },
 ]
 
@@ -227,7 +127,13 @@ function CountrySelect({ value, onChange }) {
       >
         {selected ? (
           <>
-            <ReactCountryFlag countryCode={selected.code} svg style={{ width: '1.3em', height: '1em', borderRadius: 2 }} />
+            <img
+              src={`https://flagcdn.com/w20/${selected.code.toLowerCase()}.png`}
+              alt=""
+              width="20"
+              height="15"
+              style={{ borderRadius: 2, objectFit: 'cover' }}
+            />
             <span style={{ fontFamily: 'monospace', fontSize: '0.82rem' }}>{selected.d}</span>
           </>
         ) : (
@@ -240,37 +146,70 @@ function CountrySelect({ value, onChange }) {
         <>
           <div onClick={() => setOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 998 }} />
           <div style={{
-            position: 'absolute', top: 'calc(100% + 4px)', left: 0,
-            width: 280, maxHeight: 300,
+            position: 'absolute',
+            top: 'calc(100% + 4px)',
+            left: 0,
+            width: 290,
+            maxHeight: 320,
             background: 'rgba(4,6,26,0.99)',
-            border: '1px solid rgba(100,140,255,0.25)',
-            borderRadius: 10, zIndex: 999,
+            border: '1px solid rgba(100,140,255,0.28)',
+            borderRadius: 12,
+            zIndex: 999,
             boxShadow: '0 20px 60px rgba(0,0,60,0.9)',
-            display: 'flex', flexDirection: 'column', overflow: 'hidden',
+            display: 'flex',
+            flexDirection: 'column',
+            overflow: 'hidden',
           }}>
             <input
               autoFocus
               value={search}
               onChange={e => setSearch(e.target.value)}
-              placeholder="Search…"
-              style={{ ...input, border: 'none', borderBottom: '1px solid rgba(100,140,255,0.15)', borderRadius: 0, fontSize: '0.8rem' }}
+              placeholder="Search country…"
+              style={{
+                ...input,
+                border: 'none',
+                borderBottom: '1px solid rgba(100,140,255,0.15)',
+                borderRadius: 0,
+                fontSize: '0.8rem',
+                padding: '10px 14px',
+              }}
             />
             <div style={{ overflowY: 'auto', flex: 1 }}>
-              {filtered.map(c => (
+              {filtered.length === 0 ? (
+                <div style={{ padding: 16, color: 'rgba(160,185,255,0.4)', fontSize: '0.8rem', textAlign: 'center' }}>
+                  No results
+                </div>
+              ) : filtered.map(c => (
                 <button
                   key={c.code}
                   type="button"
                   onClick={() => { onChange(c.d); setOpen(false); setSearch('') }}
                   style={{
-                    width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-                    padding: '8px 12px', background: value === c.d ? 'rgba(100,140,255,0.15)' : 'transparent',
-                    border: 'none', color: 'rgba(210,225,255,0.85)', cursor: 'pointer',
-                    textAlign: 'left', fontFamily: 'inherit', fontSize: '0.8rem',
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 10,
+                    padding: '9px 14px',
+                    background: value === c.d ? 'rgba(100,140,255,0.15)' : 'transparent',
+                    border: 'none',
+                    color: 'rgba(210,225,255,0.85)',
+                    cursor: 'pointer',
+                    textAlign: 'left',
+                    fontFamily: 'inherit',
+                    fontSize: '0.82rem',
                   }}
+                  onMouseEnter={e => { if (value !== c.d) e.currentTarget.style.background = 'rgba(100,140,255,0.08)' }}
+                  onMouseLeave={e => { if (value !== c.d) e.currentTarget.style.background = 'transparent' }}
                 >
-                  <ReactCountryFlag countryCode={c.code} svg style={{ width: '1.3em', height: '1em', borderRadius: 2, flexShrink: 0 }} />
-                  <span style={{ flex: 1 }}>{c.n}</span>
-                  <span style={{ fontFamily: 'monospace', fontSize: '0.72rem', color: 'rgba(140,170,255,0.5)' }}>{c.d}</span>
+                  <img
+                    src={`https://flagcdn.com/w20/${c.code.toLowerCase()}.png`}
+                    alt=""
+                    width="20"
+                    height="15"
+                    style={{ borderRadius: 2, objectFit: 'cover', flexShrink: 0 }}
+                  />
+                  <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.n}</span>
+                  <span style={{ color: 'rgba(140,170,255,0.5)', fontSize: '0.72rem', fontFamily: 'monospace' }}>{c.d}</span>
                 </button>
               ))}
             </div>
@@ -281,12 +220,7 @@ function CountrySelect({ value, onChange }) {
   )
 }
 
-function flagEmoji(iso) {
-  if (!iso) return ''
-  return iso.toUpperCase().replace(/./g, c =>
-    String.fromCodePoint(127397 + c.charCodeAt())
-  )
-}
+const AuthContext = createContext(null)
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -482,12 +416,14 @@ export function AuthModal() {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const [info, setInfo] = useState(null)
+  const [showPassword, setShowPassword] = useState(false)
 
   useEffect(() => {
     if (auth.modalOpen) {
       setError(null); setInfo(null)
       setOtpSent(false); setOtp('')
       setCountryCode(''); setPhoneDigits('')
+      setShowPassword(false)
     }
   }, [auth.modalOpen, auth.mode])
 
@@ -636,15 +572,51 @@ export function AuthModal() {
                 placeholder="Email"
                 style={input}
               />
-              <input
-                type="password"
-                required
-                minLength={6}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="Password (must be at least 6 characters)"
-                style={input}
-              />
+              <div style={{ position: 'relative' }}>
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  minLength={6}
+                  value={password}
+                  onChange={e => setPassword(e.target.value)}
+                  placeholder="Password (must be at least 6 characters)"
+                  style={{ ...input, paddingRight: 42 }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(s => !s)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  style={{
+                    position: 'absolute',
+                    right: 6,
+                    top: '50%',
+                    transform: 'translateY(-50%)',
+                    background: 'transparent',
+                    border: 'none',
+                    color: 'rgba(160,185,255,0.6)',
+                    cursor: 'pointer',
+                    padding: 6,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.9rem',
+                  }}
+                >
+                  {showPassword ? (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+                      <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+                      <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+                      <line x1="1" y1="1" x2="23" y2="23" />
+                    </svg>
+                  ) : (
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                      <circle cx="12" cy="12" r="3" />
+                    </svg>
+                  )}
+                </button>
+              </div>
               {error && <div style={{ color: '#ff7777', fontSize: '0.78rem', padding: '4px 0' }}>{error}</div>}
               {info && <div style={{ color: '#88ffcc', fontSize: '0.78rem', padding: '4px 0' }}>{info}</div>}
               <button type="submit" disabled={busy} style={{ ...submitBtn, opacity: busy ? 0.6 : 1, cursor: busy ? 'wait' : 'pointer' }}>
@@ -665,16 +637,7 @@ export function AuthModal() {
             {!otpSent ? (
               <form onSubmit={sendOtp} style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
                 <div style={{ display: 'flex', gap: 8 }}>
-                  <select
-                    value={countryCode}
-                    onChange={e => setCountryCode(e.target.value)}
-                    style={{ ...input, width: 130, flexShrink: 0, cursor: 'pointer' }}
-                  >
-                    <option value="">Country</option>
-                    {COUNTRIES.map(c => (
-                      <option key={c.n} value={c.d}>{c.n} ({c.d})</option>
-                    ))}
-                  </select>
+                  <CountrySelect value={countryCode} onChange={setCountryCode} />
                   <input
                     required
                     type="tel"
@@ -720,7 +683,7 @@ export function AuthModal() {
             )}
             <div style={{ textAlign: 'center', marginTop: 14 }}>
               <button type="button" onClick={() => auth.setMode('signin')} style={linkBtn}>
-                sign in with email
+                Sign in with email
               </button>
             </div>
           </div>
