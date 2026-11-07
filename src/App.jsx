@@ -567,6 +567,49 @@ useEffect(() => {
   loadFavorites().then(setFavorites)
 }, [user])
 
+useEffect(() => {
+  document.body.style.overflow = ''
+  let startY = 0
+  let pulling = false
+
+  function onTouchStart(e) {
+    if (e.target.tagName === 'CANVAS') return
+    let el = e.target
+    while (el && el !== document.body) {
+      const s = getComputedStyle(el)
+      if (s.overflowY === 'auto' || s.overflowY === 'scroll') {
+        if (el.scrollTop > 0) return
+        break
+      }
+      el = el.parentElement
+    }
+    if (!el && window.scrollY > 0) return
+    startY = e.touches[0].clientY
+    pulling = true
+  }
+
+  function onTouchMove(e) {
+    if (!pulling) return
+    if (e.touches[0].clientY - startY > 120) {
+      pulling = false
+      window.location.reload()
+    }
+  }
+
+  function onTouchEnd() { pulling = false }
+
+  window.addEventListener('touchstart', onTouchStart, { passive: true })
+  window.addEventListener('touchmove', onTouchMove, { passive: true })
+  window.addEventListener('touchend', onTouchEnd, { passive: true })
+  return () => {
+    document.body.style.overflow = ''
+    window.removeEventListener('touchstart', onTouchStart)
+    window.removeEventListener('touchmove', onTouchMove)
+    window.removeEventListener('touchend', onTouchEnd)
+  }
+}, [])
+
+
  const toggleFav = async (name) => {
   if (!user) { openSignIn(); return }
   if (favorites.includes(name)) {
@@ -905,7 +948,10 @@ useEffect(() => {
       <header style={{ position:'absolute', top:0, left:0, right:0, zIndex:20, display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', rowGap:'8px', padding:'12px clamp(10px,4vw,28px)', background:'linear-gradient(to bottom, rgba(2,3,15,0.96) 55%, transparent)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:'10px' }}>
           <span style={{ fontSize:'1.15rem' }}>☄️</span>
-          <span style={{ color:'#fff', fontSize:'1.15rem', fontWeight:300, letterSpacing:'0.28em', fontFamily:'Georgia, serif' }}>ASTROTRIP</span>
+         <span
+  onClick={() => window.location.href = '/'}
+  style={{ color:'#fff', fontSize:'1.15rem', fontWeight:300, letterSpacing:'0.20em', fontFamily:'Georgia, serif', cursor:'pointer', userSelect:'none' }}
+>ASTROTRIP</span>
         </div>
         <SearchBar items={SEARCH_ITEMS} onSelect={(it) => flyToRef.current?.(it.name)} />
           <nav className="main-nav" style={{ display:'flex', gap:'4px', alignItems:'center', flexWrap:'wrap' }}>
@@ -915,7 +961,7 @@ useEffect(() => {
           <button style={nb(page === 'AstroReport')} onClick={() => { setPage('AstroReport'); setSelected(null) }}>AstroReport</button>
           <button style={nb(page === 'AstroGaze')} onClick={() => { setPage('AstroGaze'); setSelected(null) }}>AstroGaze</button>
 
-          <button style={{ ...nb(showFavs), fontSize:'1rem', padding:'clamp(5px,1.5vw,7px) clamp(8px,2.5vw,12px)', display:'flex', alignItems:'center', gap:'5px' }} onClick={() => setShowFavs(v => !v)}>
+          <button style={{ ...nb(showFavs), fontSize:'1rem', padding:'clamp(5px,1.5vw,7px) clamp(8px,2.5vw,12px)', display:'flex', alignItems:'center', gap:'5px' }} onClick={() => window.location.href = '/'}>
             ★{favorites.length > 0 && <span style={{ background:'#5577ff', color:'#fff', borderRadius:'10px', fontSize:'0.68rem', padding:'1px 5px', fontWeight:600 }}>{favorites.length}</span>}
           </button>
           <AuthButton />

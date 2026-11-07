@@ -105,8 +105,10 @@ export default function AstroHit({ onBack }) {
     const canvas = canvasRef.current
     const ctx = canvas.getContext('2d')
 
-    const W = () => canvas.width
-    const H = () => canvas.height
+    const isMobile = window.innerWidth < 768
+    let DPR = 1
+    const W = () => canvas.width / DPR
+    const H = () => canvas.height / DPR
 
     let scoreVal = 0
     let livesVal = 3
@@ -125,6 +127,7 @@ export default function AstroHit({ onBack }) {
     let moonBaked = null
     let moonBakedCX = 0
     let moonBakedCY = 0
+    let moonBakedSize = 0
 
     function desiredMeteorCount() {
       if (scoreVal < 100) return 1
@@ -142,13 +145,20 @@ export default function AstroHit({ onBack }) {
     }
 
     function resize() {
-      canvas.width = canvas.offsetWidth
-      canvas.height = canvas.offsetHeight
+      DPR = Math.min(window.devicePixelRatio || 1, 3)
+      const cssW = canvas.offsetWidth
+      const cssH = canvas.offsetHeight
+      canvas.width = Math.floor(cssW * DPR)
+      canvas.height = Math.floor(cssH * DPR)
+      canvas.style.width = cssW + 'px'
+      canvas.style.height = cssH + 'px'
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0)
       computeTarget()
-      const baked = bakeMoonBase(target.r)
+      const baked = bakeMoonBase(target.r, DPR)
       moonBaked = baked.canvas
       moonBakedCX = baked.cx
       moonBakedCY = baked.cy
+      moonBakedSize = baked.cssSize
       for (const m of meteors) {
         const dx = target.x - m.x
         const dy = target.y - m.y
@@ -339,7 +349,7 @@ export default function AstroHit({ onBack }) {
       }
 
       if (moonBaked) {
-        ctx.drawImage(moonBaked, target.x - moonBakedCX, target.y - moonBakedCY)
+        ctx.drawImage(moonBaked, target.x - moonBakedCX, target.y - moonBakedCY, moonBakedSize, moonBakedSize)
       }
 
       ctx.save()
@@ -429,11 +439,10 @@ export default function AstroHit({ onBack }) {
       }
 
       ctx.textAlign = 'right'
-      ctx.font = '18px Inter, sans-serif'
-      let livesStr = ''
-      for (let i = 0; i < livesVal; i++) livesStr += '❤️ '
-      if (livesVal === 0) livesStr = '💀'
-      ctx.fillText(livesStr, W() - 20, 36)
+      ctx.font = 'bold 14px Inter, sans-serif'
+      ctx.fillStyle = '#ff8888'
+      if (livesVal === 0) ctx.fillText('💀', W() - 20, 36)
+      else ctx.fillText(`❤️ ×${livesVal}`, W() - 20, 36)
     }
     loop()
 
@@ -449,7 +458,7 @@ export default function AstroHit({ onBack }) {
     <div style={s.root}>
       <button style={s.backBtn} onClick={onBack}>← Games</button>
       <div style={s.menuBox}>
-        <div style={s.icon}>🌕</div>
+        <div style={{ width: '96px', height: '96px', borderRadius: '50%', background: 'radial-gradient(circle, rgba(255,102,34,0.4) 0%, rgba(255,102,34,0.12) 50%, transparent 75%)', boxShadow: '0 0 60px rgba(255,102,34,0.3)' }} />
         <h1 style={s.title}>Astro Hit</h1>
         <p style={s.subtitle}>Asteroids are falling toward the Moon. Tap before they slip past.</p>
         <div style={s.rulesBox}>
@@ -574,15 +583,17 @@ function drawCrater(ctx, cx, cy, r, hot) {
   }
 }
 
-function bakeMoonBase(r) {
+function bakeMoonBase(r, dpr = 1) {
   const pad = 30
-  const size = Math.ceil(r * 2 + pad * 2)
+  const sizeCss = Math.ceil(r * 2 + pad * 2)
+  const sizeBacking = Math.ceil(sizeCss * dpr)
   const c = document.createElement('canvas')
-  c.width = size
-  c.height = size
+  c.width = sizeBacking
+  c.height = sizeBacking
   const bctx = c.getContext('2d')
-  const cx = size / 2
-  const cy = size / 2
+  bctx.scale(dpr, dpr)
+  const cx = sizeCss / 2
+  const cy = sizeCss / 2
 
   const grad = bctx.createRadialGradient(cx - r * 0.42, cy - r * 0.42, r * 0.08, cx, cy, r)
   grad.addColorStop(0,    '#f4f0e4')
@@ -636,7 +647,7 @@ function bakeMoonBase(r) {
   bctx.lineWidth = 1.8
   bctx.stroke()
 
-  return { canvas: c, cx, cy }
+  return { canvas: c, cx, cy, cssSize: sizeCss }
 }
 
 function drawImpactEffects(ctx, moon, imp) {
